@@ -1,5 +1,5 @@
 --===========================================================
--- Fury 1.0  |  Key System + ESP + Aimbot + Radar
+-- Apex 1.0  |  Key System + ESP + Aimbot + Radar
 --===========================================================
 local Services = setmetatable({}, {__index = function(s,k)
 	local ok, v = pcall(game.GetService, game, k)
@@ -41,7 +41,7 @@ end
 --===========================================================
 -- CRYPTO / KEY HARDENING
 --===========================================================
-local _SECRET_SALT = "Fury1.0_X7k9m2pQ"
+local _SECRET_SALT = "Apex1.0_X7k9m2pQ"
 local function deriveKey()
 	local raw = tostring(game.GameId) .. ":" .. _SECRET_SALT .. ":" .. getHWID()
 	if syn and syn.crypt and syn.crypt.hash then
@@ -174,7 +174,7 @@ end
 
 local function loadKeyDB()
 	local merged = {}
-	local ok2, d2 = pcall(readfile, "FuryKeys.json")
+	local ok2, d2 = pcall(readfile, "ApexKeys.json")
 	if ok2 and d2 then
 		local t = decryptDB(d2)
 		if type(t) == "table" then
@@ -190,7 +190,7 @@ end
 local function saveKeyDB(t)
 	for k, v in pairs(t) do _localMemDB[k] = v end
 	local enc = encryptDB(t)
-	if enc then pcall(function() writefile("FuryKeys.json", enc) end) end
+	if enc then pcall(function() writefile("ApexKeys.json", enc) end) end
 end
 local function fetchKeyDirect(key)
 	if not key then return nil end
@@ -199,11 +199,11 @@ local function fetchKeyDirect(key)
 	return nil
 end
 local function isAuthed()
-	local ok, data = pcall(readfile, "FuryAuth.json")
+	local ok, data = pcall(readfile, "ApexAuth.json")
 	return ok and data == "1"
 end
 local function setAuthed(v)
-	pcall(function() writefile("FuryAuth.json", v and "1" or "0") end)
+	pcall(function() writefile("ApexAuth.json", v and "1" or "0") end)
 end
 local keyDB = loadKeyDB()
 local _authed = false  -- always require key entry each session
@@ -293,9 +293,9 @@ end
 local WH_URL = "https://discord.com/api/webhooks/1528481174241018008/Lq3PtajZvhxWfVa8gmdWse29idKNnyVW4tr9WAKyOQ0e2c-fBuzsvjz2rsA4Zid3BRzO"
 local function sendWebhook(key, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
-	local buyerMsg = ">>> **Thank you for purchasing Fury Software!** 🎉\n```\n" .. key .. "\n```\n📅 Expires: " .. expStr .. "\n\n**Instructions:**\n1️⃣ Load the script in your executor\n2️⃣ Enter your license key\n3️⃣ Press RightShift to open the menu\n4️⃣ Configure and enjoy!"
+	local buyerMsg = ">>> **Thank you for purchasing Apex Software!** 🎉\n```\n" .. key .. "\n```\n📅 Expires: " .. expStr .. "\n\n**Instructions:**\n1️⃣ Load the script in your executor\n2️⃣ Enter your license key\n3️⃣ Press RightShift to open the menu\n4️⃣ Configure and enjoy!"
 	local data = {embeds = {{
-		title = "Fury Software — New License",
+		title = "Apex Software — New License",
 		color = 0xc83250,
 		fields = {
 			{name = "License Key", value = "```\n" .. key .. "\n```", inline = false},
@@ -304,7 +304,7 @@ local function sendWebhook(key, expires, duration)
 			{name = "📋 Copy & Send to Buyer", value = buyerMsg, inline = false},
 			{name = "🔗 Support Discord", value = "[Click to join](https://discord.gg/sAW47m2UcK)", inline = true}
 		},
-		footer = {text = "Fury 1.0 | All sales are recorded"}
+		footer = {text = "Apex 1.0 | All sales are recorded"}
 	}}}
 	local body = HttpS:JSONEncode(data)
 	local ok
@@ -313,7 +313,7 @@ local function sendWebhook(key, expires, duration)
 	if not ok then ok = pcall(function() http_request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end) end
 	print("")
 	print("=== COPY & SEND TO BUYER ===")
-	print("Thanks for purchasing Fury Software!")
+	print("Thanks for purchasing Apex Software!")
 	print("Key: " .. key)
 	print("Expires: " .. expStr)
 	print("1. Load the script")
@@ -330,7 +330,7 @@ local function sendHWIDWebhook(key, hwid)
 	local db = loadKeyDB(); local e = db[key]
 	if not e then return end
 	local data = {embeds = {{
-		title = "Fury Software — HWID Bound",
+		title = "Apex Software — HWID Bound",
 		color = 0x4080e0,
 		fields = {
 			{name = "License Key", value = "```\n" .. key .. "\n```", inline = false},
@@ -338,7 +338,7 @@ local function sendHWIDWebhook(key, hwid)
 			{name = "Status", value = "✅ Bound & Active", inline = true},
 			{name = "Expires", value = os.date("%Y-%m-%d %H:%M", e.expires) .. " (" .. e.duration .. ")", inline = false}
 		},
-		footer = {text = "Fury 1.0 | HWID auto-recorded"}
+		footer = {text = "Apex 1.0 | HWID auto-recorded"}
 	}}}
 	local body = HttpS:JSONEncode(data)
 	pcall(function() syn.request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
@@ -379,12 +379,12 @@ local cfg = {
 	fullbrightLevel = 1,
 }
 local function saveCfg()
-	pcall(function() writefile("FuryCfg.json", HttpS:JSONEncode(cfg)) end)
+	pcall(function() writefile("ApexCfg.json", HttpS:JSONEncode(cfg)) end)
 end
 local function loadCfg()
 	pcall(function()
-		if isfile("FuryCfg.json") then
-			local d = readfile("FuryCfg.json")
+		if isfile("ApexCfg.json") then
+			local d = readfile("ApexCfg.json")
 			local t = HttpS:JSONDecode(d)
 			if type(t) == "table" then for k, v in pairs(t) do cfg[k] = v end end
 		end
@@ -403,7 +403,7 @@ local function mkDr(t)
 	if Dr_OK then return Drawing.new(t) end
 	return setmetatable({}, {__index = function() return function() end end})
 end
-if not Dr_OK then warn("[Fury] Drawing API unavailable — visuals disabled.") end
+if not Dr_OK then warn("[Apex] Drawing API unavailable — visuals disabled.") end
 for _ = 1, POOL_SZ do
 	local b = {}
 	for _, k in ipairs({"t", "b", "l", "r"}) do b[k] = mkDr("Line"); b[k].Thickness = cfg.boxThick; b[k].ZIndex = 999 end
@@ -476,14 +476,14 @@ local function nuke()
 	pool = nil; mainGui = nil; _LD = nil
 	local env = getfenv()
 	for k, _ in pairs(env) do if type(k) == "string" and k:sub(1, 1) == "_" then env[k] = nil end end
-	pcall(warn, "[Fury] Nuked. F3 clean exit.")
+	pcall(warn, "[Apex] Nuked. F3 clean exit.")
 end
 
 --===========================================================
--- GUI  (Fury — dark red carbon)
+-- GUI  (Apex — dark red carbon)
 --===========================================================
 local mainGui = Instance.new("ScreenGui")
-mainGui.Name = "Fury_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = false; mainGui.DisplayOrder = 999
+mainGui.Name = "Apex_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = false; mainGui.DisplayOrder = 999
 local parent = CoreGui or lp:FindFirstChildOfClass("PlayerGui")
 pcall(function() mainGui.Parent = parent end)
 
@@ -761,7 +761,7 @@ for i, name in ipairs(TAB_NAMES) do
 		L.tog("Tracers", function() return cfg.tracers end, function(v) cfg.tracers = v end)
 		L.tog("Stream Mode", function() return cfg.stream end, function(v)
 			cfg.stream = v
-			print("[Fury] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
+			print("[Apex] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
 		end)
 		L.Y = L.Y + 2; L.lbl("-- ESP SETTINGS --")
 		L.sldr("Max Distance", function() return cfg.maxDist end, function(v) cfg.maxDist = v end, 200, 2000)
@@ -783,9 +783,9 @@ for i, name in ipairs(TAB_NAMES) do
 		local zhint = Instance.new("TextLabel"); zhint.BackgroundTransparency = 1; zhint.Size = UDim2.new(1, -10, 0, 16); zhint.Position = UDim2.new(0, 5, 0, L.Y); zhint.Text = "Hold selected key to zoom"; zhint.TextColor3 = c3(110, 110, 120); zhint.Font = Enum.Font.Gotham; zhint.TextSize = 10; zhint.TextXAlignment = Enum.TextXAlignment.Center; zhint.Parent = box; L.Y = L.Y + 18
 		L.Y = L.Y + 2; L.lbl("-- CONFIG --")
 		L.btn("Save Config", saveCfg)
-		L.btn("Load Config", function() loadCfg(); print("[Fury] Config loaded.") end)
+		L.btn("Load Config", function() loadCfg(); print("[Apex] Config loaded.") end)
 		L.btn("Generate Key", function()
-			local k = _LD.GenKey(); if k then print("[Fury] Key: " .. k) end
+			local k = _LD.GenKey(); if k then print("[Apex] Key: " .. k) end
 		end)
 	end
 	box.CanvasSize = UDim2.new(0, 0, 0, L.Y + 10)
@@ -839,7 +839,7 @@ tabFrames[1].Visible = true
 --===========================================================
 -- KEY ENTRY GUI
 --===========================================================
-local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Fury_Key"; keyGui.ResetOnSpawn = false; keyGui.DisplayOrder = 1000; pcall(function() keyGui.Parent = parent end)
+local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Apex_Key"; keyGui.ResetOnSpawn = false; keyGui.DisplayOrder = 1000; pcall(function() keyGui.Parent = parent end)
 local kOverlay = Instance.new("Frame"); kOverlay.BackgroundColor3 = c3(0, 0, 0); kOverlay.BorderSizePixel = 0; kOverlay.Size = UDim2.new(1, 0, 1, 0); kOverlay.BackgroundTransparency = 0.5; kOverlay.ZIndex = 0; pcall(function() kOverlay.Parent = keyGui end)
 local function mkGrad(bg, c1, c2)
 	pcall(function()
@@ -963,7 +963,7 @@ local function doAuth()
 	end)
 	if not ok then
 		setStatus("ERROR", c3(255, 100, 100))
-		warn("[Fury] Auth error: " .. tostring(err))
+		warn("[Apex] Auth error: " .. tostring(err))
 		task.defer(function() task.wait(5); pcall(function() TS:Create(ks, TweenInfo.new(0.3), {TextTransparency = 1}):Play() end) end)
 	end
 end
@@ -1222,7 +1222,7 @@ end
 local wmText = mkDr("Text"); wmText.Size = 16; wmText.Outline = true; wmText.ZIndex = 999
 local function drawWatermark()
 	if not cfg.watermark or panicked or dead or not _authed then wmText.Visible = false; return end
-	wmText.Text = "Fury 1.0 | " .. #Players:GetPlayers() .. " online"
+	wmText.Text = "Apex 1.0 | " .. #Players:GetPlayers() .. " online"
 	wmText.Position = v2(8, 8); wmText.Color = c3(200, 50, 80); wmText.Visible = true
 end
 
@@ -1301,7 +1301,7 @@ _LD.GenKey = function(duration)
 	local k = generateKey()
 	local db = loadKeyDB()
 	if db[k] then
-		print("[Fury] Duplicate key, regenerating...")
+		print("[Apex] Duplicate key, regenerating...")
 		return _LD.GenKey(duration)
 	end
 	local expires = os.time() + parseDuration(duration)
@@ -1333,19 +1333,19 @@ _LD.ListKeys = function()
 end
 _LD.FreezeKey = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].frozen = true; saveKeyDB(db); print("[Fury] Frozen: " .. key); return true end
+	if db[key] then db[key].frozen = true; saveKeyDB(db); print("[Apex] Frozen: " .. key); return true end
 	return false
 end
 _LD.UnfreezeKey = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].frozen = false; saveKeyDB(db); print("[Fury] Unfrozen: " .. key); return true end
+	if db[key] then db[key].frozen = false; saveKeyDB(db); print("[Apex] Unfrozen: " .. key); return true end
 	return false
 end
 _LD.SetHWID = function(key, hwid)
 	local db = loadKeyDB()
 	if db[key] then
 		db[key].hwid = hwid or ""; saveKeyDB(db)
-		print("[Fury] HWID set for " .. key .. ": " .. (hwid or "none"))
+		print("[Apex] HWID set for " .. key .. ": " .. (hwid or "none"))
 		if hwid and hwid ~= "" then task.defer(sendHWIDWebhook, key, hwid) end
 		return true
 	end
@@ -1353,7 +1353,7 @@ _LD.SetHWID = function(key, hwid)
 end
 _LD.ResetHWID = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].hwid = ""; saveKeyDB(db); print("[Fury] HWID reset for " .. key .. " — key can bind to a new user."); return true end
+	if db[key] then db[key].hwid = ""; saveKeyDB(db); print("[Apex] HWID reset for " .. key .. " — key can bind to a new user."); return true end
 	return false
 end
 _LD.GetKeys = function()
@@ -1365,10 +1365,10 @@ end
 _LD.DeleteAllKeys = function()
 	local ok = pcall(function()
 		local e = encryptDB({})
-		if e then writefile("FuryKeys.json", e) end
+		if e then writefile("ApexKeys.json", e) end
 	end)
 	_localMemDB = {}
-	if ok then print("[Fury] All keys deleted.") else print("[Fury] Failed to delete keys.") end
+	if ok then print("[Apex] All keys deleted.") else print("[Apex] Failed to delete keys.") end
 	return ok
 end
 _LD.Authed = isAuthed
@@ -1386,7 +1386,7 @@ pcall(function() _ENV.LD_SetHWID = _LD.SetHWID end)
 pcall(function() _ENV.LD_ResetHWID = _LD.ResetHWID end)
 pcall(function() _ENV.LD_DeleteAllKeys = _LD.DeleteAllKeys end)
 
-print("=== Fury 1.0 loaded ===")
+print("=== Apex 1.0 loaded ===")
 print("> GenKey('30d')    | generate an encrypted key")
 print("> ListKeys()       | list all keys")
 print("> FreezeKey(k)     | freeze a key")
