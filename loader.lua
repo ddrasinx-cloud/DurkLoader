@@ -230,6 +230,8 @@ local cfg = {
 	zoom = false,
 	zoomKey = "Z",
 	zoomFOV = 40,
+	fullbright = false,
+	fullbrightLevel = 1,
 }
 local function saveCfg()
 	pcall(function() writefile("FuryCfg.json", HttpS:JSONEncode(cfg)) end)
@@ -539,6 +541,9 @@ for i, name in ipairs(TAB_NAMES) do
 		L.tog("Skeleton", function() return cfg.skel end, function(v) cfg.skel = v end)
 		L.tog("Team Check", function() return cfg.teamCheck end, function(v) cfg.teamCheck = v end)
 		L.tog("Crosshair", function() return cfg.crosshair end, function(v) cfg.crosshair = v end)
+		L.tog("Fullbright", function() return cfg.fullbright end, function(v) cfg.fullbright = v end)
+		L.Y = L.Y + 2; L.lbl("-- FULLBRIGHT --")
+		L.sldr("Brightness", function() return cfg.fullbrightLevel end, function(v) cfg.fullbrightLevel = v end, 0.5, 3)
 		L.tog("Stream Mode", function() return cfg.stream end, function(v)
 			cfg.stream = v
 			print("[Fury] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
@@ -909,6 +914,24 @@ local function drawFOV()
 	fovC.Position = vs / 2; fovC.Radius = fp; fovC.Color = c3(255, 255, 255); fovC.Transparency = 0.55; fovC.Visible = true
 end
 
+-- Fullbright
+local Lighting = Services.Lighting
+local origBrightness, origAmbient, origOutdoor = Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient
+local origFogColor, origFogEnd = Lighting.FogColor, Lighting.FogEnd
+local function doFullbright()
+	if not cfg.fullbright or panicked or dead or not _authed then
+		Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient = origBrightness, origAmbient, origOutdoor
+		Lighting.FogColor, Lighting.FogEnd = origFogColor, origFogEnd
+		return
+	end
+	local lv = cfg.fullbrightLevel
+	Lighting.Brightness = lv * 2
+	Lighting.Ambient = Color3.new(lv * 0.4, lv * 0.4, lv * 0.4)
+	Lighting.OutdoorAmbient = Color3.new(lv * 0.5, lv * 0.5, lv * 0.5)
+	Lighting.FogColor = Color3.new(0, 0, 0)
+	Lighting.FogEnd = 1e9
+end
+
 -- Crosshair
 local chLine1 = mkDr("Line"); chLine1.Thickness = 1.5; chLine1.ZIndex = 999
 local chLine2 = mkDr("Line"); chLine2.Thickness = 1.5; chLine2.ZIndex = 999
@@ -990,7 +1013,7 @@ hook(RunS.RenderStepped:Connect(function(dt)
 	else
 		f3Down = false
 	end
-	doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
+	doFullbright(); doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
 end))
 
 --===========================================================
