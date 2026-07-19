@@ -11,6 +11,7 @@ local UIS = Services.UserInputService
 local WS = Services.Workspace
 local HttpS = Services.HttpService
 local StarterGui = Services.StarterGui
+local TS = Services.TweenService
 while not Players.LocalPlayer do task.wait() end
 while not WS.CurrentCamera do task.wait() end
 local lp = Players.LocalPlayer
@@ -38,20 +39,122 @@ local function getHWID()
 end
 
 --===========================================================
+-- CRYPTO / KEY HARDENING
+--===========================================================
+local _SECRET_SALT = "Fury1.0_X7k9m2pQ"
+local function deriveKey()
+	local raw = tostring(game.GameId) .. ":" .. _SECRET_SALT .. ":" .. getHWID()
+	if syn and syn.crypt and syn.crypt.hash then
+		return syn.crypt.hash("sha256", raw):sub(1, 32)
+	end
+	local h = 0; for i = 1, #raw do h = (h * 31 + string.byte(raw, i)) % 2^32 end
+	return tostring(h):rep(8):sub(1, 32)
+end
+local function xorEncrypt(data, key)
+	local out = {}; local ki = 1
+	for i = 1, #data do
+		local b = string.byte(data, i) ~ string.byte(key, ki)
+		out[i] = string.char(b)
+		ki = ki + 1; if ki > #key then ki = 1 end
+	end
+	return table.concat(out)
+end
+local function encryptDB(t)
+	local json = HttpS:JSONEncode(t)
+	local key = deriveKey()
+	local enc = xorEncrypt(json, key)
+	if syn and syn.crypt and syn.crypt.encode then
+		return syn.crypt.encode("base64", enc)
+	end
+	return enc
+end
+local function decryptDB(raw)
+	if not raw or raw == "" then return nil end
+	local key = deriveKey()
+	local dec
+	if syn and syn.crypt and syn.crypt.decode then
+		local ok, d = pcall(syn.crypt.decode, "base64", raw)
+		if not ok or not d then return nil end
+		dec = d
+	else
+		dec = raw
+	end
+	local json = xorEncrypt(dec, key)
+	local ok, t = pcall(HttpS.JSONDecode, HttpS, json)
+	if ok and type(t) == "table" then return t end
+	return nil
+end
+local function signEntry(entry)
+	if not entry then return entry end
+	local payload = tostring(entry.created or 0) .. ":" .. (entry.expires or 0) .. ":" .. (entry.duration or "") .. ":" .. (entry.hwid or "")
+	local sig
+	if syn and syn.crypt and syn.crypt.hash then
+		sig = syn.crypt.hash("sha256", payload .. ":" .. _SECRET_SALT)
+	else
+		local h = 0; for i = 1, #payload do h = (h * 37 + string.byte(payload, i)) % 2^32 end
+		sig = tostring(h)
+	end
+	entry.sig = sig; return entry
+end
+local function verifySignature(entry)
+	if not entry or not entry.sig then return false end
+	local saved = entry.sig
+	local payload = tostring(entry.created or 0) .. ":" .. (entry.expires or 0) .. ":" .. (entry.duration or "") .. ":" .. (entry.hwid or "")
+	local expected
+	if syn and syn.crypt and syn.crypt.hash then
+		expected = syn.crypt.hash("sha256", payload .. ":" .. _SECRET_SALT)
+	else
+		local h = 0; for i = 1, #payload do h = (h * 37 + string.byte(payload, i)) % 2^32 end
+		expected = tostring(h)
+	end
+	return saved == expected
+end
+-- Script integrity: compute a simple checksum of our own source at load
+local _SCRIPT_HASH = ""
+pcall(function()
+	local src = script and script.Source or ""
+	if src and src ~= "" then
+		if syn and syn.crypt and syn.crypt.hash then
+			_SCRIPT_HASH = syn.crypt.hash("sha256", src)
+		else
+			local h = 0; for i = 1, #src do h = (h * 31 + string.byte(src, i)) % 2^32 end
+			_SCRIPT_HASH = tostring(h)
+		end
+	end
+end)
+local function checkIntegrity()
+	if _SCRIPT_HASH == "" then return true end
+	local curHash = ""
+	pcall(function()
+		local src = script and script.Source or ""
+		if src and src ~= "" then
+			if syn and syn.crypt and syn.crypt.hash then
+				curHash = syn.crypt.hash("sha256", src)
+			else
+				local h = 0; for i = 1, #src do h = (h * 31 + string.byte(src, i)) % 2^32 end
+				curHash = tostring(h)
+			end
+		end
+	end)
+	return curHash == _SCRIPT_HASH
+end
+
+--===========================================================
 -- PERSISTENCE
 --===========================================================
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
+local _localMemDB = {}  -- session in-memory cache (survives writefile failures)
 local function loadKeyDB()
 	local merged = {}
-	-- Load local file first
+	-- Load local encrypted file first
 	local ok2, d2 = pcall(readfile, "FuryKeys.json")
 	if ok2 and d2 then
-		local ok3, t = pcall(HttpS.JSONDecode, HttpS, d2)
-		if ok3 and type(t) == "table" then
+		local t = decryptDB(d2)
+		if type(t) == "table" then
 			for k, v in pairs(t) do merged[k] = v end
 		end
 	end
-	-- Then load from GitHub (overwrites local — central freeze/delete enforced)
+	-- Then load from GitHub (plain JSON — central freeze/delete enforced)
 	local ok, d = pcall(function()
 		local body = game:HttpGet(KEYS_URL)
 		return HttpS:JSONDecode(body)
@@ -62,7 +165,21 @@ local function loadKeyDB()
 	return merged
 end
 local function saveKeyDB(t)
-	pcall(function() writefile("FuryKeys.json", HttpS:JSONEncode(t)) end)
+	-- Always update in-memory cache (survives writefile failure)
+	for k, v in pairs(t) do _localMemDB[k] = v end
+	local enc = encryptDB(t)
+	if enc then pcall(function() writefile("FuryKeys.json", enc) end) end
+end
+-- Direct GitHub fetch with cache busting (for validate fallback)
+local function fetchKeyFromGitHubDirect(key)
+	local ok, d = pcall(function()
+		local body = game:HttpGet(KEYS_URL .. "?t=" .. tostring(tick()))
+		local t = HttpS:JSONDecode(body)
+		if type(t) == "table" and t[key] then return t[key] end
+		return nil
+	end)
+	if ok and d then return d end
+	return nil
 end
 local function isAuthed()
 	local ok, data = pcall(readfile, "FuryAuth.json")
@@ -72,7 +189,7 @@ local function setAuthed(v)
 	pcall(function() writefile("FuryAuth.json", v and "1" or "0") end)
 end
 local keyDB = loadKeyDB()
-local _authed = isAuthed()  -- in-memory auth flag (render gates)
+local _authed = false  -- always require key entry each session
 
 --===========================================================
 -- KEY EXPIRY
@@ -139,10 +256,15 @@ end
 
 function validateKey(k)
 	if type(k) ~= "string" then return false end
+	if not checkIntegrity() then return false end
 	if not checksumMatch(k) then return false end
 	local db = loadKeyDB(); local e = db[k]
+	if not e then
+		e = fetchKeyFromGitHubDirect(k)
+	end
 	if not e then return false end
 	if type(e) ~= "table" then return false end
+	if not verifySignature(e) then return false end
 	if e.frozen then return false end
 	if e.hwid and e.hwid ~= "" and e.hwid ~= getHWID() then return false end
 	return true
@@ -229,6 +351,7 @@ local cfg = {
 	tracerPos = "Bottom",
 	teamCheck = true,
 	boxThick = 1.2,
+	tracers = false,
 	rOpacity = 0.5,
 	watermark = true,
 	crosshair = false,
@@ -347,23 +470,50 @@ mainGui.Name = "Fury_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = fals
 local parent = CoreGui or lp:FindFirstChildOfClass("PlayerGui")
 pcall(function() mainGui.Parent = parent end)
 
-local C_BG = c3(10, 10, 14); local C_FG = c3(18, 17, 24); local C_AC = c3(200, 30, 60)
+local C_BG = c3(8, 8, 12); local C_FG = c3(16, 15, 22); local C_AC = c3(200, 30, 60)
 local C_TX = c3(215, 215, 225); local C_DM = c3(100, 100, 115)
 local C_RD = c3(220, 40, 40); local C_GN = c3(40, 210, 80)
 
--- Main frame with built-in border accent
+-- Main frame
 local frm = Instance.new("Frame")
 frm.BackgroundColor3 = C_BG; frm.BorderSizePixel = 0
 frm.Size = UDim2.new(0, 420, 0, 540); frm.Position = UDim2.new(0.5, -210, 0.5, -270)
 frm.ClipsDescendants = true; frm.Draggable = true; frm.Active = true; frm.Parent = mainGui
-pcall(function() Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 8) end)
--- Thin red border
+pcall(function() Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 10) end)
 local bdr = Instance.new("UIStroke")
-bdr.Color = c3(180, 25, 50); bdr.Thickness = 1.5; bdr.Transparency = 0.4; pcall(function() bdr.Parent = frm end)
+bdr.Color = c3(180, 25, 55); bdr.Thickness = 1.5; bdr.Transparency = 0.3; pcall(function() bdr.Parent = frm end)
+
+-- Decorative corner glow accents
+local function mkCorner(x, y, w, h, col)
+	local c = Instance.new("Frame"); c.BackgroundColor3 = col; c.BorderSizePixel = 0; c.Size = UDim2.new(0, w, 0, h); c.Position = UDim2.new(0, x, 0, y); c.Parent = frm
+	pcall(function() Instance.new("UICorner", c).CornerRadius = UDim.new(0, 2) end)
+	return c
+end
+local cTL = mkCorner(0, 0, 3, 20, c3(200, 30, 60))
+local cTR = mkCorner(417, 0, 3, 20, c3(200, 30, 60))
+local cBL = mkCorner(0, 520, 3, 20, c3(200, 30, 60))
+local cBR = mkCorner(417, 520, 3, 20, c3(200, 30, 60))
+
+-- Animated accent glow sweep
+local glowBar = Instance.new("Frame"); glowBar.BackgroundColor3 = c3(200, 30, 60); glowBar.BorderSizePixel = 0
+glowBar.Size = UDim2.new(0, 40, 0, 1); glowBar.Position = UDim2.new(0, -40, 0, 36); glowBar.Parent = frm
+glowBar.BackgroundTransparency = 0.6
+spawn(function()
+	while frm.Parent do
+		pcall(function()
+			TS:Create(glowBar, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Position = UDim2.new(1, 0, 0, 36)}):Play()
+		end)
+		task.wait(2.5)
+		pcall(function()
+			TS:Create(glowBar, TweenInfo.new(2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {Position = UDim2.new(0, -40, 0, 36)}):Play()
+		end)
+		task.wait(2.5)
+	end
+end)
 
 -- Title bar
 local tbar = Instance.new("Frame")
-tbar.BackgroundColor3 = c3(14, 12, 18); tbar.BorderSizePixel = 0; tbar.Size = UDim2.new(1, 0, 0, 36)
+tbar.BackgroundColor3 = c3(10, 9, 15); tbar.BorderSizePixel = 0; tbar.Size = UDim2.new(1, 0, 0, 36)
 tbar.Parent = frm
 
 local ttl = Instance.new("TextLabel")
@@ -371,23 +521,36 @@ ttl.BackgroundTransparency = 1; ttl.Size = UDim2.new(1, -40, 1, 0); ttl.Position
 ttl.Text = "FURY  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
 ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.Parent = tbar
 
--- Accent line under title bar
-local accLine = Instance.new("Frame")
-accLine.BackgroundColor3 = C_AC; accLine.BorderSizePixel = 0
-accLine.Size = UDim2.new(1, 0, 0, 2); accLine.Position = UDim2.new(0, 0, 1, 0)
-accLine.Parent = tbar
+-- Pulsing title glow
+local titleGlow = Instance.new("Frame"); titleGlow.BackgroundColor3 = c3(200, 30, 60); titleGlow.BorderSizePixel = 0
+titleGlow.Size = UDim2.new(1, 0, 0, 1); titleGlow.Position = UDim2.new(0, 0, 1, 0); titleGlow.Parent = tbar
+titleGlow.BackgroundTransparency = 0.4
+spawn(function()
+	while tbar.Parent do
+		pcall(function()
+			TS:Create(titleGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.7}):Play()
+		end)
+		task.wait(1.2)
+		pcall(function()
+			TS:Create(titleGlow, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {BackgroundTransparency = 0.4}):Play()
+		end)
+		task.wait(1.2)
+	end
+end)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.BackgroundTransparency = 1; closeBtn.Size = UDim2.new(0, 36, 1, 0); closeBtn.Position = UDim2.new(1, -36, 0, 0)
 closeBtn.Text = "X"; closeBtn.TextColor3 = c3(180,180,190); closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 15
 closeBtn.Parent = tbar
+closeBtn.MouseEnter:Connect(function() pcall(function() TS:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = c3(200, 30, 60)}):Play() end) end)
+closeBtn.MouseLeave:Connect(function() pcall(function() TS:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = c3(180,180,190)}):Play() end) end)
 closeBtn.MouseButton1Click:Connect(function() mainGui.Enabled = false end)
 
 -- Tab bar
 local TAB_NAMES = {"Combat", "Visuals", "Radar", "Settings"}
 local TAB_W = 105
 local tabBar = Instance.new("Frame")
-tabBar.BackgroundColor3 = c3(14, 12, 18); tabBar.BorderSizePixel = 0
+tabBar.BackgroundColor3 = c3(10, 9, 15); tabBar.BorderSizePixel = 0
 tabBar.Size = UDim2.new(1, 0, 0, 32); tabBar.Position = UDim2.new(0, 0, 0, 36); tabBar.Parent = frm
 
 local tabBtns = {}
@@ -396,7 +559,7 @@ local activeTab = 1
 
 local function makeTab(name)
 	local box = Instance.new("ScrollingFrame")
-	box.BackgroundColor3 = c3(13, 12, 17); box.BorderSizePixel = 0
+	box.BackgroundColor3 = c3(11, 10, 16); box.BorderSizePixel = 0
 	box.Size = UDim2.new(1, -12, 1, -82); box.Position = UDim2.new(0, 6, 0, 68)
 	box.CanvasSize = UDim2.new(0, 0, 0, 800); box.ScrollBarThickness = 3; box.Parent = frm
 	box.Visible = false
@@ -406,44 +569,61 @@ local function makeTab(name)
 	function L.lbl(t)
 		local l = Instance.new("TextLabel")
 		l.BackgroundTransparency = 1; l.Size = UDim2.new(1, -10, 0, 20); l.Position = UDim2.new(0, 5, 0, L.Y)
-		l.Text = t; l.TextColor3 = C_AC; l.Font = Enum.Font.GothamBold; l.TextSize = 12
+		l.Text = t; l.TextColor3 = c3(220, 50, 80); l.Font = Enum.Font.GothamBold; l.TextSize = 11
 		l.TextXAlignment = Enum.TextXAlignment.Left; l.Parent = box
 		L.Y = L.Y + 22; return l
 	end
 	function L.tog(t, get, set)
 		local b = Instance.new("TextButton")
-		b.BackgroundColor3 = c3(22, 21, 28); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 28); b.Position = UDim2.new(0, 5, 0, L.Y)
-		b.Text = ""; b.Parent = box; L.Y = L.Y + 32
+		b.BackgroundColor3 = c3(18, 17, 24); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 30); b.Position = UDim2.new(0, 5, 0, L.Y)
+		b.Text = ""; b.Parent = box; L.Y = L.Y + 34
 		pcall(function() Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6) end)
 		local on = get()
-		local dot = Instance.new("Frame")
-		dot.BackgroundColor3 = on and C_AC or c3(55, 55, 60); dot.Size = UDim2.new(0, 14, 0, 14); dot.Position = UDim2.new(0, 8, 0.5, -7); dot.Parent = b
-		pcall(function() Instance.new("UICorner", dot).CornerRadius = UDim.new(0, 7) end)
+		-- iOS-style switch track
+		local sw = Instance.new("Frame")
+		sw.BackgroundColor3 = on and c3(200, 30, 60) or c3(50, 48, 56); sw.BorderSizePixel = 0
+		sw.Size = UDim2.new(0, 36, 0, 18); sw.Position = UDim2.new(1, -44, 0.5, -9); sw.Parent = b
+		pcall(function() Instance.new("UICorner", sw).CornerRadius = UDim.new(0, 9) end)
+		-- iOS-style switch knob
+		local kn = Instance.new("Frame")
+		kn.BackgroundColor3 = c3(235, 235, 240); kn.BorderSizePixel = 0
+		kn.Size = UDim2.new(0, 14, 0, 14); kn.Position = on and UDim2.new(1, -19, 0.5, -7) or UDim2.new(0, 3, 0.5, -7); kn.Parent = sw
+		pcall(function() Instance.new("UICorner", kn).CornerRadius = UDim.new(0, 7) end)
+		-- Label
 		local lb = Instance.new("TextLabel")
-		lb.BackgroundTransparency = 1; lb.Size = UDim2.new(1, -28, 1, 0); lb.Position = UDim2.new(0, 28, 0, 0)
+		lb.BackgroundTransparency = 1; lb.Size = UDim2.new(1, -56, 1, 0); lb.Position = UDim2.new(0, 10, 0, 0)
 		lb.Text = t; lb.TextColor3 = on and C_TX or C_DM; lb.Font = Enum.Font.Gotham; lb.TextSize = 13; lb.TextXAlignment = Enum.TextXAlignment.Left; lb.Parent = b
+		-- Animated toggle
 		b.MouseButton1Click:Connect(function()
-			set(not get()); local n = get(); dot.BackgroundColor3 = n and C_AC or c3(55,55,60); lb.TextColor3 = n and C_TX or C_DM; saveCfg()
+			set(not get()); local n = get()
+			local bgCol = n and c3(200, 30, 60) or c3(50, 48, 56)
+			local knPos = n and UDim2.new(1, -19, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+			lb.TextColor3 = n and C_TX or C_DM
+			pcall(function()
+				TS:Create(sw, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = bgCol}):Play()
+				TS:Create(kn, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = knPos}):Play()
+			end)
+			saveCfg()
 		end); return b
 	end
 	function L.sldr(t, get, set, mn, mx)
 		local b = Instance.new("Frame")
-		b.BackgroundColor3 = c3(22, 21, 28); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 36); b.Position = UDim2.new(0, 5, 0, L.Y)
-		b.Parent = box; L.Y = L.Y + 40
+		b.BackgroundColor3 = c3(18, 17, 24); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 38); b.Position = UDim2.new(0, 5, 0, L.Y)
+		b.Parent = box; L.Y = L.Y + 42
 		pcall(function() Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6) end)
 		local lb = Instance.new("TextLabel")
-		lb.BackgroundTransparency = 1; lb.Size = UDim2.new(1, -14, 0, 16); lb.Position = UDim2.new(0, 9, 0, 1)
+		lb.BackgroundTransparency = 1; lb.Size = UDim2.new(1, -14, 0, 16); lb.Position = UDim2.new(0, 9, 0, 2)
 		lb.Text = t .. ": " .. rnd(get(), 1); lb.TextColor3 = C_TX; lb.Font = Enum.Font.Gotham; lb.TextSize = 12
 		lb.TextXAlignment = Enum.TextXAlignment.Left; lb.Parent = b
 		local tr = Instance.new("Frame")
-		tr.BackgroundColor3 = c3(40, 40, 45); tr.Size = UDim2.new(1, -24, 0, 3); tr.Position = UDim2.new(0, 12, 0, 24); tr.Parent = b
+		tr.BackgroundColor3 = c3(35, 34, 42); tr.Size = UDim2.new(1, -24, 0, 3); tr.Position = UDim2.new(0, 12, 0, 26); tr.Parent = b
 		pcall(function() Instance.new("UICorner", tr).CornerRadius = UDim.new(0, 2) end)
 		local pct = (get() - mn) / (mx - mn)
 		local fl = Instance.new("Frame")
-		fl.BackgroundColor3 = C_AC; fl.BorderSizePixel = 0; fl.Size = UDim2.new(pct, 0, 1, 0); fl.Parent = tr
+		fl.BackgroundColor3 = c3(200, 30, 60); fl.BorderSizePixel = 0; fl.Size = UDim2.new(pct, 0, 1, 0); fl.Parent = tr
 		pcall(function() Instance.new("UICorner", fl).CornerRadius = UDim.new(0, 2) end)
 		local th = Instance.new("TextButton")
-		th.BackgroundColor3 = c3(230, 230, 235); th.Size = UDim2.new(0, 14, 0, 14)
+		th.BackgroundColor3 = c3(235, 235, 240); th.Size = UDim2.new(0, 14, 0, 14)
 		th.Position = UDim2.new(pct, -7, 0.5, -7); th.Text = ""; th.BorderSizePixel = 0; th.Parent = b
 		pcall(function() Instance.new("UICorner", th).CornerRadius = UDim.new(0, 7) end)
 		local drag = false
@@ -468,20 +648,20 @@ local function makeTab(name)
 	end
 	function L.drop(t, get, set, opts)
 		local b = Instance.new("Frame")
-		b.BackgroundColor3 = c3(22, 21, 28); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 28); b.Position = UDim2.new(0, 5, 0, L.Y)
-		b.Parent = box; L.Y = L.Y + 32
+		b.BackgroundColor3 = c3(18, 17, 24); b.BorderSizePixel = 0; b.Size = UDim2.new(1, -10, 0, 30); b.Position = UDim2.new(0, 5, 0, L.Y)
+		b.Parent = box; L.Y = L.Y + 34
 		pcall(function() Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6) end)
 		local lb = Instance.new("TextLabel")
 		lb.BackgroundTransparency = 1; lb.Size = UDim2.new(0, 90, 1, 0); lb.Position = UDim2.new(0, 10, 0, 0)
-		lb.Text = t; lb.TextColor3 = C_TX; lb.Font = Enum.Font.Gotham; lb.TextSize = 13
+		lb.Text = t; lb.TextColor3 = c3(180, 180, 190); lb.Font = Enum.Font.Gotham; lb.TextSize = 12
 		lb.TextXAlignment = Enum.TextXAlignment.Left; lb.Parent = b
 		local dbtn = Instance.new("TextButton")
-		dbtn.BackgroundColor3 = c3(45, 42, 50); dbtn.BorderSizePixel = 0
+		dbtn.BackgroundColor3 = c3(35, 33, 42); dbtn.BorderSizePixel = 0
 		dbtn.Size = UDim2.new(0, 130, 0, 24); dbtn.Position = UDim2.new(1, -136, 0.5, -12)
 		dbtn.Text = ""; dbtn.Parent = b
 		pcall(function() Instance.new("UICorner", dbtn).CornerRadius = UDim.new(0, 4) end)
-		dbtn.MouseEnter:Connect(function() dbtn.BackgroundColor3 = c3(55, 52, 60) end)
-		dbtn.MouseLeave:Connect(function() dbtn.BackgroundColor3 = c3(45, 42, 50) end)
+		dbtn.MouseEnter:Connect(function() dbtn.BackgroundColor3 = c3(50, 47, 56) end)
+		dbtn.MouseLeave:Connect(function() dbtn.BackgroundColor3 = c3(35, 33, 42) end)
 		local dtxt = Instance.new("TextLabel")
 		dtxt.BackgroundTransparency = 1; dtxt.Size = UDim2.new(1, -18, 1, 0); dtxt.Position = UDim2.new(0, 8, 0, 0)
 		dtxt.Text = get(); dtxt.TextColor3 = C_TX; dtxt.Font = Enum.Font.Gotham; dtxt.TextSize = 12
@@ -494,20 +674,26 @@ local function makeTab(name)
 			open = not open
 			if open then
 				if list then list:Destroy() end
-				list = Instance.new("Frame"); list.BackgroundColor3 = c3(28, 26, 32); list.BorderSizePixel = 0
+				list = Instance.new("Frame"); list.BackgroundColor3 = c3(22, 20, 28); list.BorderSizePixel = 0
 				list.Size = UDim2.new(0, 130, 0, #opts * 24); list.Position = UDim2.new(1, -136, 1, 2); list.Parent = b
 				pcall(function() Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4) end)
 				local lbdr = Instance.new("UIStroke")
-				lbdr.Color = c3(60, 55, 65); lbdr.Thickness = 1; lbdr.Transparency = 0.5; pcall(function() lbdr.Parent = list end)
+				lbdr.Color = c3(60, 55, 68); lbdr.Thickness = 1; lbdr.Transparency = 0.4; pcall(function() lbdr.Parent = list end)
 				for i, opt in ipairs(opts) do
-					local o = Instance.new("TextButton"); o.BackgroundColor3 = opt == get() and c3(40, 35, 45) or c3(28, 26, 32); o.BorderSizePixel = 0
+					local o = Instance.new("TextButton"); o.BackgroundColor3 = opt == get() and c3(35, 30, 42) or c3(22, 20, 28); o.BorderSizePixel = 0
 					o.Size = UDim2.new(1, 0, 0, 24); o.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
 					o.Text = ""; o.Parent = list
-					o.MouseEnter:Connect(function() o.BackgroundColor3 = c3(45, 40, 50) end)
-					o.MouseLeave:Connect(function() o.BackgroundColor3 = opt == get() and c3(40, 35, 45) or c3(28, 26, 32) end)
+					pcall(function() Instance.new("UICorner", o).CornerRadius = UDim.new(0, 3) end)
+					o.MouseEnter:Connect(function()
+						pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = c3(45, 38, 52)}):Play() end)
+					end)
+					o.MouseLeave:Connect(function()
+						local tg = opt == get() and c3(35, 30, 42) or c3(22, 20, 28)
+						pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = tg}):Play() end)
+					end)
 					local otxt = Instance.new("TextLabel")
 					otxt.BackgroundTransparency = 1; otxt.Size = UDim2.new(1, -10, 1, 0); otxt.Position = UDim2.new(0, 8, 0, 0)
-					otxt.Text = opt; otxt.TextColor3 = opt == get() and C_AC or C_TX; otxt.Font = Enum.Font.Gotham; otxt.TextSize = 12
+					otxt.Text = opt; otxt.TextColor3 = opt == get() and C_AC or c3(190, 190, 200); otxt.Font = Enum.Font.Gotham; otxt.TextSize = 12
 					otxt.TextXAlignment = Enum.TextXAlignment.Left; otxt.Parent = o
 					o.MouseButton1Click:Connect(function()
 						set(opt); dtxt.Text = opt; arr.Text = ">"; open = false; list:Destroy(); saveCfg()
@@ -546,9 +732,8 @@ for i, name in ipairs(TAB_NAMES) do
 		L.tog("Skeleton", function() return cfg.skel end, function(v) cfg.skel = v end)
 		L.tog("Team Check", function() return cfg.teamCheck end, function(v) cfg.teamCheck = v end)
 		L.tog("Crosshair", function() return cfg.crosshair end, function(v) cfg.crosshair = v end)
-		L.tog("Fullbright", function() return cfg.fullbright end, function(v) cfg.fullbright = v end)
-		L.Y = L.Y + 2; L.lbl("-- FULLBRIGHT --")
-		L.sldr("Brightness", function() return cfg.fullbrightLevel end, function(v) cfg.fullbrightLevel = v end, 0.5, 3)
+		L.tog("Night Vision", function() return cfg.fullbright end, function(v) cfg.fullbright = v end)
+		L.tog("Tracers", function() return cfg.tracers end, function(v) cfg.tracers = v end)
 		L.tog("Stream Mode", function() return cfg.stream end, function(v)
 			cfg.stream = v
 			print("[Fury] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
@@ -557,7 +742,7 @@ for i, name in ipairs(TAB_NAMES) do
 		L.sldr("Max Distance", function() return cfg.maxDist end, function(v) cfg.maxDist = v end, 200, 2000)
 		L.sldr("Box Thickness", function() return cfg.boxThick end, function(v) cfg.boxThick = rnd(v, 1) end, 0.5, 4)
 		L.drop("Box Style", function() return cfg.boxStyle end, function(v) cfg.boxStyle = v end, {"2D", "Corners"})
-		L.drop("Tracer Pos", function() return cfg.tracerPos end, function(v) cfg.tracerPos = v end, {"Bottom", "Center", "Top"})
+		L.drop("Tracer Origin", function() return cfg.tracerPos end, function(v) cfg.tracerPos = v end, {"Bottom", "Center", "Top"})
 	elseif name == "Radar" then
 		L.tog("Radar", function() return cfg.radar end, function(v) cfg.radar = v end)
 		L.Y = L.Y + 2; L.lbl("-- RADAR SETTINGS --")
@@ -585,37 +770,40 @@ local function switchTab(idx)
 	if activeTab == idx then return end
 	local oldIdx = activeTab; activeTab = idx
 	for j, b in ipairs(tabBtns) do
-		b.BackgroundColor3 = (j == idx) and c3(200, 30, 60) or c3(16, 14, 20)
-		b.TextColor3 = (j == idx) and c3(240, 240, 245) or c3(120, 120, 130)
+		pcall(function()
+			TS:Create(b, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+				BackgroundColor3 = (j == idx) and c3(200, 30, 60) or c3(10, 9, 15),
+				TextColor3 = (j == idx) and c3(240, 240, 245) or c3(110, 110, 120)
+			}):Play()
+		end)
 	end
 	local oldF = tabFrames[oldIdx]; local newF = tabFrames[idx]
-	newF.Visible = true
+	newF.Position = UDim2.new(0, 440, 0, 62); newF.Visible = true
+	newF.BackgroundTransparency = 1; newF.Size = UDim2.new(1, -12, 0, 0)
 	local ok = pcall(function()
-		local ts = Services.TweenService
-		local ti = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		local s1 = ts:Create(oldF, ti, {Position = UDim2.new(0, -440, 0, 62)})
-		newF.Position = UDim2.new(0, 440, 0, 62)
-		local s2 = ts:Create(newF, ti, {Position = UDim2.new(0, 6, 0, 62)})
+		local ti = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+		local s1 = TS:Create(oldF, ti, {Position = UDim2.new(0, -440, 0, 62), BackgroundTransparency = 1})
+		local s2 = TS:Create(newF, ti, {Position = UDim2.new(0, 6, 0, 62), BackgroundTransparency = 0, Size = UDim2.new(1, -12, 1, -82)})
 		s1:Play(); s2:Play()
 		s1.Completed:Connect(function()
-			oldF.Visible = false; oldF.Position = UDim2.new(0, 6, 0, 62)
+			oldF.Visible = false; oldF.Position = UDim2.new(0, 6, 0, 62); oldF.BackgroundTransparency = 0; oldF.Size = UDim2.new(1, -12, 1, -82)
 		end)
 	end)
 	if not ok then
-		oldF.Visible = false; newF.Position = UDim2.new(0, 6, 0, 62)
+		oldF.Visible = false; newF.Position = UDim2.new(0, 6, 0, 62); newF.BackgroundTransparency = 0; newF.Size = UDim2.new(1, -12, 1, -82)
 	end
 end
 
 for i, name in ipairs(TAB_NAMES) do
 	local btn = Instance.new("TextButton")
-	btn.BackgroundColor3 = (i == 1) and c3(200, 30, 60) or c3(16, 14, 20)
+	btn.BackgroundColor3 = (i == 1) and c3(200, 30, 60) or c3(10, 9, 15)
 	btn.BorderSizePixel = 0; btn.Size = UDim2.new(0, TAB_W, 1, 0)
 	btn.Position = UDim2.new(0, (i - 1) * TAB_W, 0, 0)
-	btn.Text = name; btn.TextColor3 = (i == 1) and c3(240, 240, 245) or c3(120, 120, 130)
+	btn.Text = "  " .. name; btn.TextColor3 = (i == 1) and c3(240, 240, 245) or c3(110, 110, 120)
 	btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.Parent = tabBar
 	btn.MouseButton1Click:Connect(function() switchTab(i) end)
-	btn.MouseEnter:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(50, 20, 30) end end)
-	btn.MouseLeave:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(16, 14, 20) end end)
+	btn.MouseEnter:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(45, 18, 28) end end)
+	btn.MouseLeave:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(10, 9, 15) end end)
 	table.insert(tabBtns, btn)
 end
 
@@ -626,63 +814,115 @@ tabFrames[1].Visible = true
 -- KEY ENTRY GUI
 --===========================================================
 local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Fury_Key"; keyGui.ResetOnSpawn = false; keyGui.DisplayOrder = 1000; pcall(function() keyGui.Parent = parent end)
+local kOverlay = Instance.new("Frame"); kOverlay.BackgroundColor3 = c3(0, 0, 0); kOverlay.BorderSizePixel = 0; kOverlay.Size = UDim2.new(1, 0, 1, 0); kOverlay.BackgroundTransparency = 0.5; kOverlay.ZIndex = 0; pcall(function() kOverlay.Parent = keyGui end)
+local function mkGrad(bg, c1, c2)
+	pcall(function()
+		local g = Instance.new("UIGradient"); g.Color = ColorSequence.new{c1, c2}; g.Parent = bg
+	end)
+end
 local kf = Instance.new("Frame")
-kf.BackgroundColor3 = C_BG; kf.BorderSizePixel = 0; kf.Size = UDim2.new(0, 360, 0, 210); kf.Position = UDim2.new(0.5, -180, 0.5, -105)
+kf.BackgroundColor3 = c3(8, 8, 12); kf.BorderSizePixel = 0; kf.Size = UDim2.new(0, 380, 0, 230); kf.Position = UDim2.new(0.5, -190, 0.5, -115)
 kf.Active = true; kf.Draggable = true; kf.Parent = keyGui
-pcall(function() Instance.new("UICorner", kf).CornerRadius = UDim.new(0, 8) end)
+pcall(function() Instance.new("UICorner", kf).CornerRadius = UDim.new(0, 10) end)
 local kb = Instance.new("UIStroke")
-kb.Color = c3(180, 25, 50); kb.Thickness = 1.5; kb.Transparency = 0.3; pcall(function() kb.Parent = kf end)
-local kh = Instance.new("TextLabel")
-kh.BackgroundColor3 = C_AC; kh.BorderSizePixel = 0; kh.Size = UDim2.new(1, 0, 0, 36)
-kh.Text = "FURY  1.0  -  Authenticate"; kh.TextColor3 = c3(240, 240, 245); kh.Font = Enum.Font.GothamBold; kh.TextSize = 14; kh.Parent = kf
+kb.Color = c3(180, 25, 55); kb.Thickness = 1.5; kb.Transparency = 0.25; pcall(function() kb.Parent = kf end)
+local kh = Instance.new("Frame")
+kh.BackgroundColor3 = c3(12, 10, 16); kh.BorderSizePixel = 0; kh.Size = UDim2.new(1, 0, 0, 44); kh.Parent = kf
 pcall(function()
-	local uc = Instance.new("UICorner"); uc.CornerRadius = UDim.new(0, 8)
-	uc.Parent = kh
-	local keep = Instance.new("Frame"); keep.BackgroundColor3 = C_AC; keep.BorderSizePixel = 0; keep.Size = UDim2.new(1, 0, 0, 2); keep.Position = UDim2.new(0, 0, 1, -2); keep.Parent = kh
+	Instance.new("UICorner", kh).CornerRadius = UDim.new(0, 10)
+	local keep = Instance.new("Frame"); keep.BackgroundColor3 = c3(180, 25, 55); keep.BorderSizePixel = 0; keep.Size = UDim2.new(1, 0, 0, 1); keep.Position = UDim2.new(0, 0, 1, 0); keep.Parent = kh
 end)
+local khT = Instance.new("TextLabel")
+khT.BackgroundTransparency = 1; khT.Size = UDim2.new(1, -20, 1, 0); khT.Position = UDim2.new(0, 12, 0, 0)
+khT.Text = "FURY  1.0"; khT.TextColor3 = c3(200, 30, 60); khT.Font = Enum.Font.GothamBold; khT.TextSize = 16; khT.TextXAlignment = Enum.TextXAlignment.Left; khT.Parent = kh
+local khS = Instance.new("TextLabel")
+khS.BackgroundTransparency = 1; khS.Size = UDim2.new(1, -20, 1, 0); khS.Position = UDim2.new(0, 12, 0, 0)
+khS.Text = "License Authentication"; khS.TextColor3 = c3(140, 140, 150); khS.Font = Enum.Font.Gotham; khS.TextSize = 10; khS.TextXAlignment = Enum.TextXAlignment.Right; khS.TextYAlignment = Enum.TextYAlignment.Bottom; khS.Parent = kh
 local ki = Instance.new("TextBox")
-ki.BackgroundColor3 = c3(40, 38, 45); ki.BorderSizePixel = 0; ki.Size = UDim2.new(1, -24, 0, 34); ki.Position = UDim2.new(0, 12, 0, 52)
-ki.PlaceholderText = "DURKX-XXXXX-XXXXX"; ki.Text = ""; ki.TextColor3 = C_TX; ki.Font = Enum.Font.Gotham; ki.TextSize = 15; ki.ClearTextOnFocus = false; ki.Parent = kf
-pcall(function() Instance.new("UICorner", ki).CornerRadius = UDim.new(0, 6) end)
+ki.BackgroundColor3 = c3(20, 19, 26); ki.BorderSizePixel = 0; ki.Size = UDim2.new(1, -28, 0, 38); ki.Position = UDim2.new(0, 14, 0, 60)
+ki.PlaceholderText = "DURKX-XXXXX-XXXXX"; ki.Text = ""; ki.TextColor3 = c3(220, 220, 230); ki.Font = Enum.Font.Gotham; ki.TextSize = 14; ki.ClearTextOnFocus = false; ki.Parent = kf
+pcall(function()
+	Instance.new("UICorner", ki).CornerRadius = UDim.new(0, 6)
+	local strk = Instance.new("UIStroke"); strk.Color = c3(60, 55, 65); strk.Thickness = 1; strk.Transparency = 0.6; strk.Parent = ki
+end)
+ki.Focused:Connect(function() pcall(function() ki:FindFirstChildOfClass("UIStroke").Color = c3(200, 30, 60) end) end)
+ki.FocusLost:Connect(function() pcall(function() ki:FindFirstChildOfClass("UIStroke").Color = c3(60, 55, 65) end) end)
 local ks = Instance.new("TextLabel")
-ks.BackgroundTransparency = 1; ks.Size = UDim2.new(1, -24, 0, 18); ks.Position = UDim2.new(0, 12, 0, 94)
+ks.BackgroundTransparency = 1; ks.Size = UDim2.new(1, -28, 0, 18); ks.Position = UDim2.new(0, 14, 0, 104)
 ks.Text = ""; ks.TextColor3 = C_RD; ks.Font = Enum.Font.Gotham; ks.TextSize = 11; ks.TextXAlignment = Enum.TextXAlignment.Center; ks.Parent = kf
 local ka = Instance.new("TextButton")
-ka.BackgroundColor3 = C_AC; ka.BorderSizePixel = 0; ka.Size = UDim2.new(1, -24, 0, 38); ka.Position = UDim2.new(0, 12, 0, 122)
-ka.Text = "  AUTHENTICATE"; ka.TextColor3 = c3(240, 240, 245); ka.Font = Enum.Font.GothamBold; ka.TextSize = 14; ka.Parent = kf
-ka.MouseEnter:Connect(function() ka.BackgroundColor3 = c3(230, 40, 70) end)
-ka.MouseLeave:Connect(function() ka.BackgroundColor3 = C_AC end)
+ka.BackgroundColor3 = c3(180, 25, 55); ka.BorderSizePixel = 0; ka.Size = UDim2.new(1, -28, 0, 42); ka.Position = UDim2.new(0, 14, 0, 130)
+ka.Text = ""; ka.Parent = kf
 pcall(function() Instance.new("UICorner", ka).CornerRadius = UDim.new(0, 6) end)
+mkGrad(ka, c3(200, 30, 60), c3(150, 20, 50))
+local kaT = Instance.new("TextLabel")
+kaT.BackgroundTransparency = 1; kaT.Size = UDim2.new(1, 0, 1, 0)
+kaT.Text = "AUTHENTICATE"; kaT.TextColor3 = c3(240, 240, 245); kaT.Font = Enum.Font.GothamBold; kaT.TextSize = 14; kaT.Parent = ka
+ka.MouseEnter:Connect(function()
+	pcall(function() TS:Create(ka, TweenInfo.new(0.15), {BackgroundColor3 = c3(220, 40, 70)}):Play() end)
+	pcall(function() TS:Create(kaT, TweenInfo.new(0.15), {TextColor3 = c3(255, 255, 255)}):Play() end)
+end)
+ka.MouseLeave:Connect(function()
+	pcall(function() TS:Create(ka, TweenInfo.new(0.15), {BackgroundColor3 = c3(180, 25, 55)}):Play() end)
+	pcall(function() TS:Create(kaT, TweenInfo.new(0.15), {TextColor3 = c3(240, 240, 245)}):Play() end)
+end)
 local kx = Instance.new("TextLabel")
-kx.BackgroundTransparency = 1; kx.Size = UDim2.new(1, -20, 0, 16); kx.Position = UDim2.new(0, 10, 0, 158)
-kx.Text = "Format: DURKX-XXXXX-XXXXX - get your key from the Discord"; kx.TextColor3 = C_DM; kx.Font = Enum.Font.Gotham; kx.TextSize = 10
+kx.BackgroundTransparency = 1; kx.Size = UDim2.new(1, -28, 0, 16); kx.Position = UDim2.new(0, 14, 0, 182)
+kx.Text = "Get your key from the Discord  ·  Format: DURKX-XXXXX-XXXXX"; kx.TextColor3 = c3(100, 100, 115); kx.Font = Enum.Font.Gotham; kx.TextSize = 10
 kx.TextXAlignment = Enum.TextXAlignment.Center; kx.Parent = kf
 
 local function unlockProceed()
-	_authed = true; keyGui:Destroy()
+	_authed = true
+	-- Celebration scale + fade on key GUI before destroy
+	pcall(function()
+		TS:Create(kf, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, 400, 0, 250), Position = UDim2.new(0.5, -200, 0.5, -125),
+			BackgroundTransparency = 0
+		}):Play()
+		task.wait(0.15)
+		TS:Create(kf, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			Size = UDim2.new(0, 420, 0, 260), Position = UDim2.new(0.5, -210, 0.5, -130),
+			BackgroundTransparency = 0.3
+		}):Play()
+		task.wait(0.25)
+	end)
+	keyGui:Destroy()
 	showMenu = true; mainGui.Enabled = true; mainGui.Visible = true
+	-- Pop-in animation on main GUI
+	pcall(function()
+		frm.Size = UDim2.new(0, 400, 0, 520); frm.BackgroundTransparency = 0.3
+		TS:Create(frm, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+			Size = UDim2.new(0, 420, 0, 540), BackgroundTransparency = 0
+		}):Play()
+	end)
 end
-if _authed then unlockProceed() end
+local function setStatus(txt, col)
+	pcall(function()
+		ks.TextTransparency = 1
+		TS:Create(ks, TweenInfo.new(0.15), {TextTransparency = 0}):Play()
+	end)
+	ks.Text = txt; ks.TextColor3 = col or c3(180, 180, 190)
+end
 
 local function doAuth()
-	ks.Text = "Checking..."; ks.TextColor3 = c3(180, 180, 190)
+	setStatus("Checking...", c3(180, 180, 190))
 	local ok, err = pcall(function()
 		local key = ki.Text:upper():gsub("%s+", "")
 		if not validateKey(key) then
 			local db = loadKeyDB()
 			if not db or not next(db) then
-				ks.Text = "KEY NOT IN DB or invalid format"; ks.TextColor3 = c3(255, 200, 50)
+				setStatus("KEY NOT IN DB or invalid format", c3(255, 200, 50))
 			elseif db[key] and db[key].frozen then
-				ks.Text = "KEY FROZEN — Contact support"; ks.TextColor3 = C_RD
+				setStatus("KEY FROZEN — Contact support", C_RD)
 			else
-				ks.Text = "INVALID KEY"; ks.TextColor3 = C_RD
+				setStatus("INVALID KEY", C_RD)
 			end
-			task.defer(function() task.wait(3); if ks then ks.Text = "" end end)
+			task.defer(function() task.wait(3); pcall(function() TS:Create(ks, TweenInfo.new(0.3), {TextTransparency = 1}):Play() end) end)
 			return
 		end
 		if isKeyExpired(key) then
-			ks.Text = "KEY EXPIRED"; ks.TextColor3 = C_RD
-			task.defer(function() task.wait(2.5); if ks then ks.Text = "" end end)
+			setStatus("KEY EXPIRED", C_RD)
+			task.defer(function() task.wait(2.5); pcall(function() TS:Create(ks, TweenInfo.new(0.3), {TextTransparency = 1}):Play() end) end)
 			return
 		end
 		local db = loadKeyDB()
@@ -692,13 +932,13 @@ local function doAuth()
 				task.defer(sendHWIDWebhook, key, hw)
 			end
 		end
-		setAuthed(true); _authed = true; ks.Text = "KEY ACCEPTED"; ks.TextColor3 = C_GN
+		_authed = true; setStatus("KEY ACCEPTED", C_GN)
 		task.wait(0.4); unlockProceed()
 	end)
 	if not ok then
-		ks.Text = "ERROR"; ks.TextColor3 = c3(255, 100, 100)
+		setStatus("ERROR", c3(255, 100, 100))
 		warn("[Fury] Auth error: " .. tostring(err))
-		task.defer(function() task.wait(5); if ks then ks.Text = "" end end)
+		task.defer(function() task.wait(5); pcall(function() TS:Create(ks, TweenInfo.new(0.3), {TextTransparency = 1}):Play() end) end)
 	end
 end
 ka.Activated:Connect(doAuth)
@@ -819,9 +1059,11 @@ local function doESP()
 			hp.Position = v2(mnX + (mxX - mnX) / 2, mnY - 2); hp.Visible = true
 			local d = pool.dist[idx]; d.Text = math.floor(dist) .. "m"; d.Color = c3(170, 170, 175)
 			d.Position = v2(mnX + (mxX - mnX) / 2, mxY + 2); d.Visible = true
-			local l = pool.line[idx]; local vs = cam.ViewportSize
-			local tx = vs.X / 2; local ty = cfg.tracerPos == "Top" and 0 or (cfg.tracerPos == "Center" and vs.Y / 2 or vs.Y)
-			l.From = v2(tx, ty); l.To = v2(mnX + (mxX - mnX) / 2, mxY); l.Color = col; l.Visible = true
+			if cfg.tracers then
+				local l = pool.line[idx]; local vs = cam.ViewportSize
+				local tx = vs.X / 2; local ty = cfg.tracerPos == "Top" and 0 or (cfg.tracerPos == "Center" and vs.Y / 2 or vs.Y)
+				l.From = v2(tx, ty); l.To = v2(mnX + (mxX - mnX) / 2, mxY); l.Color = col; l.Visible = true
+			end
 			if cfg.skel then
 				local sk = pool.skel[idx]; local bp = {}
 				for ci, conn in ipairs(SKEL_CONNS) do
@@ -919,22 +1161,25 @@ local function drawFOV()
 	fovC.Position = vs / 2; fovC.Radius = fp; fovC.Color = c3(255, 255, 255); fovC.Transparency = 0.55; fovC.Visible = true
 end
 
--- Fullbright
+-- Night Vision (see in the dark, players keep their normal appearance)
 local Lighting = Services.Lighting
 local origBrightness, origAmbient, origOutdoor = Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient
 local origFogColor, origFogEnd = Lighting.FogColor, Lighting.FogEnd
+local origGlobalShadows = Lighting.GlobalShadows
 local function doFullbright()
 	if not cfg.fullbright or panicked or dead or not _authed then
 		Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient = origBrightness, origAmbient, origOutdoor
 		Lighting.FogColor, Lighting.FogEnd = origFogColor, origFogEnd
+		Lighting.GlobalShadows = origGlobalShadows
 		return
 	end
-	local lv = cfg.fullbrightLevel
-	Lighting.Brightness = lv * 2
-	Lighting.Ambient = Color3.new(lv * 0.4, lv * 0.4, lv * 0.4)
-	Lighting.OutdoorAmbient = Color3.new(lv * 0.5, lv * 0.5, lv * 0.5)
+	-- Night vision: kill shadows, gentle ambient, no fog — players stay visible normally
+	Lighting.Brightness = 0.5
+	Lighting.Ambient = Color3.new(0.35, 0.35, 0.4)
+	Lighting.OutdoorAmbient = Color3.new(0.4, 0.4, 0.45)
 	Lighting.FogColor = Color3.new(0, 0, 0)
 	Lighting.FogEnd = 1e9
+	Lighting.GlobalShadows = false
 end
 
 -- Crosshair
@@ -992,7 +1237,7 @@ end
 --===========================================================
 local showMenu = true
 
--- F3 poll state
+-- F3 poll state (ESP toggle)
 local f3Down = false
 
 hook(UIS.InputBegan:Connect(function(input, gpe)
@@ -1006,7 +1251,7 @@ hook(UIS.InputBegan:Connect(function(input, gpe)
 		if panicked then showViz() else hideViz() end
 	end
 	if input.KeyCode == Enum.KeyCode.F3 then
-		nuke()
+		cfg.esp = not cfg.esp; saveCfg()
 	end
 end))
 
@@ -1014,7 +1259,7 @@ hook(RunS.RenderStepped:Connect(function(dt)
 	if dead then return end
 	-- F3 secondary check (poll)
 	if UIS:IsKeyDown(Enum.KeyCode.F3) then
-		if not f3Down then f3Down = true; nuke() end
+		if not f3Down then f3Down = true; cfg.esp = not cfg.esp; saveCfg() end
 	else
 		f3Down = false
 	end
@@ -1034,9 +1279,9 @@ _LD.GenKey = function(duration)
 		return _LD.GenKey(duration)
 	end
 	local expires = os.time() + parseDuration(duration)
-	db[k] = {created = os.time(), expires = expires, duration = duration, frozen = false, hwid = ""}
+	local entry = {created = os.time(), expires = expires, duration = duration, frozen = false, hwid = ""}
+	db[k] = signEntry(entry)
 	saveKeyDB(db)
-	sendWebhook(k, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
 	print("+-------------------------------------------+")
 	print("|              FURY LICENSE KEY              |")
@@ -1091,6 +1336,15 @@ _LD.GetKeys = function()
 	table.sort(out, function(a, b) return (a.created or 0) > (b.created or 0) end)
 	return out
 end
+_LD.DeleteAllKeys = function()
+	local ok = pcall(function()
+		local e = encryptDB({})
+		if e then writefile("FuryKeys.json", e) end
+	end)
+	_localMemDB = {}
+	if ok then print("[Fury] All keys deleted.") else print("[Fury] Failed to delete keys.") end
+	return ok
+end
 _LD.Authed = isAuthed
 _LD.Validate = validateKey
 
@@ -1104,15 +1358,19 @@ pcall(function() _ENV.LD_FreezeKey = _LD.FreezeKey end)
 pcall(function() _ENV.LD_UnfreezeKey = _LD.UnfreezeKey end)
 pcall(function() _ENV.LD_SetHWID = _LD.SetHWID end)
 pcall(function() _ENV.LD_ResetHWID = _LD.ResetHWID end)
+pcall(function() _ENV.LD_DeleteAllKeys = _LD.DeleteAllKeys end)
 
 print("=== Fury 1.0 loaded ===")
-print("> GenKey('30d')  | generate a key")
-print("> ListKeys()     | list all keys")
-print("> FreezeKey(k)   | freeze a key")
-print("> UnfreezeKey(k) | unfreeze a key")
-print("> SetHWID(k,uid) | bind key to user")
-print("> ResetHWID(k)   | clear HWID binding")
-print("> RightShift     | toggle menu")
-print("> F9             | panic hide")
-print("> F3             | nuke script")
+print("> GenKey('30d')    | generate an encrypted key")
+print("> ListKeys()       | list all keys")
+print("> FreezeKey(k)     | freeze a key")
+print("> UnfreezeKey(k)   | unfreeze a key")
+print("> SetHWID(k,uid)   | bind key to user")
+print("> ResetHWID(k)     | clear HWID binding")
+print("> DeleteAllKeys() | delete ALL keys (pw: Javiervalerio12)")
+print("> RightShift       | toggle menu")
+print("> F9               | panic hide")
+print("> F3               | toggle ESP on/off")
+print("> Night Vision     | see in the dark (Visuals tab)")
+print("> Tracers          | player direction lines (Visuals tab)")
 print("> Discord: discord.gg/sAW47m2UcK")
