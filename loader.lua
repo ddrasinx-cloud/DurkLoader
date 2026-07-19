@@ -1276,9 +1276,6 @@ hook(UIS.InputBegan:Connect(function(input, gpe)
 	if input.KeyCode == Enum.KeyCode.F9 then
 		if panicked then showViz() else hideViz() end
 	end
-	if input.KeyCode == Enum.KeyCode.F3 then
-		cfg.esp = not cfg.esp; saveCfg()
-	end
 end))
 
 hook(RunS.RenderStepped:Connect(function(dt)
