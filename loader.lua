@@ -127,8 +127,13 @@ function validateKey(k)
 	if type(k) ~= "string" then return false end
 	if not checksumMatch(k) then return false end
 	local db = loadKeyDB(); local e = db[k]
-	if not e then return false end
-	if type(e) ~= "table" then return false end
+	if not e then
+		-- No DB or key not in DB → accept based on format only (buyer scenario)
+		-- If DB file exists but key not in it → key was deleted by admin → reject
+		if isfile("ApexKeys.json") then return false end
+		return true
+	end
+	if type(e) ~= "table" then return true end
 	if e.frozen then return false end
 	if e.hwid and e.hwid ~= "" and e.hwid ~= getHWID() then return false end
 	return true
@@ -630,7 +635,7 @@ ka.Text = "  AUTHENTICATE"; ka.TextColor3 = c3(240, 240, 245); ka.Font = Enum.Fo
 pcall(function() Instance.new("UICorner", ka).CornerRadius = UDim.new(0, 6) end)
 local kx = Instance.new("TextLabel")
 kx.BackgroundTransparency = 1; kx.Size = UDim2.new(1, -20, 0, 16); kx.Position = UDim2.new(0, 10, 0, 158)
-kx.Text = "Keys are validated from ApexKeys.json — get it in the Discord"; kx.TextColor3 = C_DM; kx.Font = Enum.Font.Gotham; kx.TextSize = 10
+kx.Text = "Format: DURKX-XXXXX-XXXXX — get your key from the Discord"; kx.TextColor3 = C_DM; kx.Font = Enum.Font.Gotham; kx.TextSize = 10
 kx.TextXAlignment = Enum.TextXAlignment.Center; kx.Parent = kf
 
 local function unlockProceed()
@@ -646,7 +651,7 @@ local function doAuth()
 		if not validateKey(key) then
 			local db = loadKeyDB()
 			if not db or not next(db) then
-				ks.Text = "NO DB FILE — Join discord.gg/sAW47m2UcK"; ks.TextColor3 = c3(255, 200, 50)
+				ks.Text = "KEY NOT IN DB or invalid format"; ks.TextColor3 = c3(255, 200, 50)
 			elseif db[key] and db[key].frozen then
 				ks.Text = "KEY FROZEN — Contact support"; ks.TextColor3 = C_RD
 			else
