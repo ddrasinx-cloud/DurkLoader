@@ -175,22 +175,26 @@ local function b64decode(s)
 end
 
 local function fetchGitHubAPI()
-	local ok, body = pcall(game.HttpGet, game, KEYS_API)
-	if not ok or not body then return nil end
-	local ok2, data = pcall(HttpS.JSONDecode, HttpS, body)
-	if not ok2 or type(data) ~= "table" or not data.content then return nil end
+	local ok, body = pcall(HttpS.GetAsync, HttpS, KEYS_API, true, {["User-Agent"] = "Roblox/Lua", ["Accept"] = "application/vnd.github.v3+json"})
+	if not ok or not body then
+		local ok2, body2 = pcall(game.HttpGet, game, KEYS_API)
+		if not ok2 or not body2 then return nil end
+		body = body2
+	end
+	local ok3, data = pcall(HttpS.JSONDecode, HttpS, body)
+	if not ok3 or type(data) ~= "table" or not data.content then return nil end
 	local raw = data.content:gsub("%s+", "")
 	local dec
 	if syn and syn.crypt and syn.crypt.decode then
-		local ok3, d = pcall(syn.crypt.decode, "base64", raw)
-		if ok3 and d then dec = d end
+		local ok4, d = pcall(syn.crypt.decode, "base64", raw)
+		if ok4 and d then dec = d end
 	end
 	if not dec then
 		pcall(function() dec = b64decode(raw) end)
 	end
 	if not dec then return nil end
-	local ok4, t = pcall(HttpS.JSONDecode, HttpS, dec)
-	if ok4 and type(t) == "table" then return t end
+	local ok5, t = pcall(HttpS.JSONDecode, HttpS, dec)
+	if ok5 and type(t) == "table" then return t end
 	return nil
 end
 
