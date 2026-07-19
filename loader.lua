@@ -591,7 +591,7 @@ local TAB_NAMES = {"Combat", "Visuals", "Radar", "Settings"}
 local TAB_W = 105
 local tabBar = Instance.new("Frame")
 tabBar.BackgroundColor3 = c3(10, 9, 15); tabBar.BorderSizePixel = 0
-tabBar.Size = UDim2.new(1, 0, 0, 32); tabBar.Position = UDim2.new(0, 0, 0, 36); tabBar.Parent = frm
+tabBar.Size = UDim2.new(1, 0, 0, 32); tabBar.Position = UDim2.new(0, 0, 0, 54); tabBar.Parent = frm
 
 local tabBtns = {}
 local tabFrames = {}
@@ -600,7 +600,7 @@ local activeTab = 1
 local function makeTab(name)
 	local box = Instance.new("ScrollingFrame")
 	box.BackgroundColor3 = c3(11, 10, 16); box.BorderSizePixel = 0
-	box.Size = UDim2.new(1, -12, 1, -82); box.Position = UDim2.new(0, 6, 0, 68)
+	box.Size = UDim2.new(1, -12, 1, -100); box.Position = UDim2.new(0, 6, 0, 86)
 	box.CanvasSize = UDim2.new(0, 0, 0, 800); box.ScrollBarThickness = 3; box.Parent = frm
 	box.Visible = false
 	pcall(function() Instance.new("UICorner", box).CornerRadius = UDim.new(0, 6) end)
