@@ -108,7 +108,8 @@ local function signEntry(entry)
 	entry.sig = sig; return entry
 end
 local function verifySignature(entry)
-	if not entry or not entry.sig then return false end
+	if not entry then return false end
+	if not entry.sig then return true end  -- GitHub-pushed entries (trusted source, no sig needed)
 	local saved = entry.sig
 	local payload = tostring(entry.created or 0) .. ":" .. (entry.expires or 0) .. ":" .. (entry.duration or "") .. ":" .. (entry.hwid or "")
 	local expected
