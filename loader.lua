@@ -42,19 +42,24 @@ end
 --===========================================================
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
 local function loadKeyDB()
-	-- Load from GitHub (centralized — freeze/delete enforced instantly)
+	local merged = {}
+	-- Load local file first
+	local ok2, d2 = pcall(readfile, "FuryKeys.json")
+	if ok2 and d2 then
+		local ok3, t = pcall(HttpS.JSONDecode, HttpS, d2)
+		if ok3 and type(t) == "table" then
+			for k, v in pairs(t) do merged[k] = v end
+		end
+	end
+	-- Then load from GitHub (overwrites local — central freeze/delete enforced)
 	local ok, d = pcall(function()
 		local body = game:HttpGet(KEYS_URL)
 		return HttpS:JSONDecode(body)
 	end)
-	if ok and type(d) == "table" then return d end
-	-- Fallback to local file
-	local ok2, d2 = pcall(readfile, "FuryKeys.json")
-	if ok2 and d2 then
-		local ok3, t = pcall(HttpS.JSONDecode, HttpS, d2)
-		if ok3 and type(t) == "table" then return t end
+	if ok and type(d) == "table" then
+		for k, v in pairs(d) do merged[k] = v end
 	end
-	return {}
+	return merged
 end
 local function saveKeyDB(t)
 	pcall(function() writefile("FuryKeys.json", HttpS:JSONEncode(t)) end)
