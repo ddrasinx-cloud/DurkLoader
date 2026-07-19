@@ -328,7 +328,7 @@ local function nuke()
 end
 
 --===========================================================
--- GUI  (Apex — carbon fiber / neon red)
+-- GUI  (Apex — dark red carbon)
 --===========================================================
 local mainGui = Instance.new("ScreenGui")
 mainGui.Name = "Apex_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = false; mainGui.DisplayOrder = 999
@@ -339,27 +339,15 @@ local C_BG = c3(10, 10, 14); local C_FG = c3(18, 17, 24); local C_AC = c3(200, 3
 local C_TX = c3(215, 215, 225); local C_DM = c3(100, 100, 115)
 local C_RD = c3(220, 40, 40); local C_GN = c3(40, 210, 80)
 
--- Outer glow frame
-local glowFrm = Instance.new("Frame")
-glowFrm.BackgroundColor3 = C_AC; glowFrm.BorderSizePixel = 0
-glowFrm.Size = UDim2.new(0, 424, 0, 544); glowFrm.Position = UDim2.new(0.5, -212, 0.5, -272)
-glowFrm.ClipsDescendants = true; glowFrm.Active = true; glowFrm.Parent = mainGui
-pcall(function() Instance.new("UICorner", glowFrm).CornerRadius = UDim.new(0, 10) end)
-local gGrad = Instance.new("UIGradient")
-gGrad.Color = ColorSequence.new({ColorSequenceKeypoint.new(0, c3(200,30,60)), ColorSequenceKeypoint.new(0.5, c3(140,20,40)), ColorSequenceKeypoint.new(1, c3(10,10,14))})
-gGrad.Rotation = 45; pcall(function() gGrad.Parent = glowFrm end)
-
+-- Main frame with built-in border accent
 local frm = Instance.new("Frame")
 frm.BackgroundColor3 = C_BG; frm.BorderSizePixel = 0
-frm.Size = UDim2.new(1, -4, 1, -4); frm.Position = UDim2.new(0, 2, 0, 2)
-frm.ClipsDescendants = true; frm.Draggable = true; frm.Active = true; frm.Parent = glowFrm
+frm.Size = UDim2.new(0, 420, 0, 540); frm.Position = UDim2.new(0.5, -210, 0.5, -270)
+frm.ClipsDescendants = true; frm.Draggable = true; frm.Active = true; frm.Parent = mainGui
 pcall(function() Instance.new("UICorner", frm).CornerRadius = UDim.new(0, 8) end)
-
--- Subtle top accent line
-local accLine = Instance.new("Frame")
-accLine.BackgroundColor3 = C_AC; accLine.BorderSizePixel = 0
-accLine.Size = UDim2.new(1, -40, 0, 1); accLine.Position = UDim2.new(0, 20, 0, 0)
-pcall(function() Instance.new("UIStroke", accLine).Color = c3(255,60,80) end); accLine.Parent = frm
+-- Thin red border
+local bdr = Instance.new("UIStroke")
+bdr.Color = c3(180, 25, 50); bdr.Thickness = 1.5; bdr.Transparency = 0.4; pcall(function() bdr.Parent = frm end)
 
 -- Title bar
 local tbar = Instance.new("Frame")
@@ -368,12 +356,18 @@ tbar.Parent = frm
 
 local ttl = Instance.new("TextLabel")
 ttl.BackgroundTransparency = 1; ttl.Size = UDim2.new(1, -40, 1, 0); ttl.Position = UDim2.new(0, 14, 0, 0)
-ttl.Text = "▲ APEX  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
+ttl.Text = "APEX  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
 ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.Parent = tbar
+
+-- Accent line under title bar
+local accLine = Instance.new("Frame")
+accLine.BackgroundColor3 = C_AC; accLine.BorderSizePixel = 0
+accLine.Size = UDim2.new(1, 0, 0, 2); accLine.Position = UDim2.new(0, 0, 1, 0)
+accLine.Parent = tbar
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.BackgroundTransparency = 1; closeBtn.Size = UDim2.new(0, 36, 1, 0); closeBtn.Position = UDim2.new(1, -36, 0, 0)
-closeBtn.Text = "✕"; closeBtn.TextColor3 = c3(180,180,190); closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 15
+closeBtn.Text = "X"; closeBtn.TextColor3 = c3(180,180,190); closeBtn.Font = Enum.Font.GothamBold; closeBtn.TextSize = 15
 closeBtn.Parent = tbar
 closeBtn.MouseButton1Click:Connect(function() mainGui.Enabled = false end)
 
@@ -583,6 +577,8 @@ for i, name in ipairs(TAB_NAMES) do
 	btn.Text = name; btn.TextColor3 = (i == 1) and c3(240, 240, 245) or c3(120, 120, 130)
 	btn.Font = Enum.Font.GothamBold; btn.TextSize = 12; btn.Parent = tabBar
 	btn.MouseButton1Click:Connect(function() switchTab(i) end)
+	btn.MouseEnter:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(50, 20, 30) end end)
+	btn.MouseLeave:Connect(function() if i ~= activeTab then btn.BackgroundColor3 = c3(16, 14, 20) end end)
 	table.insert(tabBtns, btn)
 end
 
@@ -597,9 +593,11 @@ local kf = Instance.new("Frame")
 kf.BackgroundColor3 = C_BG; kf.BorderSizePixel = 0; kf.Size = UDim2.new(0, 360, 0, 210); kf.Position = UDim2.new(0.5, -180, 0.5, -105)
 kf.Active = true; kf.Draggable = true; kf.Parent = keyGui
 pcall(function() Instance.new("UICorner", kf).CornerRadius = UDim.new(0, 8) end)
+local kb = Instance.new("UIStroke")
+kb.Color = c3(180, 25, 50); kb.Thickness = 1.5; kb.Transparency = 0.3; pcall(function() kb.Parent = kf end)
 local kh = Instance.new("TextLabel")
 kh.BackgroundColor3 = C_AC; kh.BorderSizePixel = 0; kh.Size = UDim2.new(1, 0, 0, 36)
-kh.Text = "▲ APEX  1.0  —  Authenticate"; kh.TextColor3 = c3(240, 240, 245); kh.Font = Enum.Font.GothamBold; kh.TextSize = 14; kh.Parent = kf
+kh.Text = "APEX  1.0  -  Authenticate"; kh.TextColor3 = c3(240, 240, 245); kh.Font = Enum.Font.GothamBold; kh.TextSize = 14; kh.Parent = kf
 pcall(function()
 	local uc = Instance.new("UICorner"); uc.CornerRadius = UDim.new(0, 8)
 	uc.Parent = kh
@@ -615,10 +613,12 @@ ks.Text = ""; ks.TextColor3 = C_RD; ks.Font = Enum.Font.Gotham; ks.TextSize = 11
 local ka = Instance.new("TextButton")
 ka.BackgroundColor3 = C_AC; ka.BorderSizePixel = 0; ka.Size = UDim2.new(1, -24, 0, 38); ka.Position = UDim2.new(0, 12, 0, 122)
 ka.Text = "  AUTHENTICATE"; ka.TextColor3 = c3(240, 240, 245); ka.Font = Enum.Font.GothamBold; ka.TextSize = 14; ka.Parent = kf
+ka.MouseEnter:Connect(function() ka.BackgroundColor3 = c3(230, 40, 70) end)
+ka.MouseLeave:Connect(function() ka.BackgroundColor3 = C_AC end)
 pcall(function() Instance.new("UICorner", ka).CornerRadius = UDim.new(0, 6) end)
 local kx = Instance.new("TextLabel")
 kx.BackgroundTransparency = 1; kx.Size = UDim2.new(1, -20, 0, 16); kx.Position = UDim2.new(0, 10, 0, 158)
-kx.Text = "Format: DURKX-XXXXX-XXXXX — get your key from the Discord"; kx.TextColor3 = C_DM; kx.Font = Enum.Font.Gotham; kx.TextSize = 10
+kx.Text = "Format: DURKX-XXXXX-XXXXX - get your key from the Discord"; kx.TextColor3 = C_DM; kx.Font = Enum.Font.Gotham; kx.TextSize = 10
 kx.TextXAlignment = Enum.TextXAlignment.Center; kx.Parent = kf
 
 local function unlockProceed()
