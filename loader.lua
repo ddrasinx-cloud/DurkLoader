@@ -564,6 +564,19 @@ spawn(function()
 		task.wait(1.2)
 	end
 end)
+-- Status bar (diagnostics)
+local stBar = Instance.new("Frame"); stBar.BackgroundColor3 = c3(6, 5, 10); stBar.BorderSizePixel = 0; stBar.Size = UDim2.new(1, 0, 0, 18); stBar.Position = UDim2.new(0, 0, 0, 36); stBar.Parent = frm
+local stLbl = Instance.new("TextLabel"); stLbl.BackgroundTransparency = 1; stLbl.Size = UDim2.new(1, -12, 1, 0); stLbl.Position = UDim2.new(0, 6, 0, 0); stLbl.Font = Enum.Font.Gotham; stLbl.TextSize = 10; stLbl.TextColor3 = c3(140, 140, 150); stLbl.TextXAlignment = Enum.TextXAlignment.Left; stLbl.Parent = stBar
+local function updateStatus()
+	local parts = {}
+	table.insert(parts, _authed and "✅Auth" or "⛔Auth")
+	table.insert(parts, Dr_OK and "✅Draw" or "⛔Draw")
+	table.insert(parts, cfg.esp and "✅ESP" or "⛔ESP")
+	table.insert(parts, panicked and "⚠️Panic" or "✅OK")
+	table.insert(parts, dead and "💀Dead" or "✅Live")
+	stLbl.Text = "  " .. table.concat(parts, " · ")
+end
+spawn(function() while frm.Parent do updateStatus(); task.wait(0.5) end end)
 
 local closeBtn = Instance.new("TextButton")
 closeBtn.BackgroundTransparency = 1; closeBtn.Size = UDim2.new(0, 36, 1, 0); closeBtn.Position = UDim2.new(1, -36, 0, 0)
