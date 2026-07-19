@@ -300,6 +300,7 @@ end
 -- WEBHOOK
 --===========================================================
 local WH_URL = "https://discord.com/api/webhooks/1528481174241018008/Lq3PtajZvhxWfVa8gmdWse29idKNnyVW4tr9WAKyOQ0e2c-fBuzsvjz2rsA4Zid3BRzO"
+local HWID_WH_URL = WH_URL -- Replace with #hwid-logs webhook URL from /setup
 local function sendWebhook(key, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
 	local buyerMsg = ">>> **Thank you for purchasing Apex Software!** 🎉\n```\n" .. key .. "\n```\n📅 Expires: " .. expStr .. "\n\n**Instructions:**\n1️⃣ Load the script in your executor\n2️⃣ Enter your license key\n3️⃣ Press RightShift to open the menu\n4️⃣ Configure and enjoy!"
@@ -350,9 +351,9 @@ local function sendHWIDWebhook(key, hwid)
 		footer = {text = "Apex 1.0 | HWID auto-recorded"}
 	}}}
 	local body = HttpS:JSONEncode(data)
-	pcall(function() syn.request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
-	pcall(function() request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
-	pcall(function() http_request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
+	pcall(function() syn.request({Url = HWID_WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
+	pcall(function() request({Url = HWID_WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
+	pcall(function() http_request({Url = HWID_WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
 end
 
 --===========================================================
