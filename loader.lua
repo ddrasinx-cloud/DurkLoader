@@ -40,11 +40,19 @@ end
 --===========================================================
 -- PERSISTENCE
 --===========================================================
+local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
 local function loadKeyDB()
-	local ok, d = pcall(readfile, "ApexKeys.json")
-	if ok and d then
-		local ok2, t = pcall(HttpS.JSONDecode, HttpS, d)
-		if ok2 and type(t) == "table" then return t end
+	-- Load from GitHub (centralized — freeze/delete enforced instantly)
+	local ok, d = pcall(function()
+		local body = game:HttpGet(KEYS_URL)
+		return HttpS:JSONDecode(body)
+	end)
+	if ok and type(d) == "table" then return d end
+	-- Fallback to local file
+	local ok2, d2 = pcall(readfile, "ApexKeys.json")
+	if ok2 and d2 then
+		local ok3, t = pcall(HttpS.JSONDecode, HttpS, d2)
+		if ok3 and type(t) == "table" then return t end
 	end
 	return {}
 end
@@ -127,13 +135,8 @@ function validateKey(k)
 	if type(k) ~= "string" then return false end
 	if not checksumMatch(k) then return false end
 	local db = loadKeyDB(); local e = db[k]
-	if not e then
-		-- No DB or key not in DB → accept based on format only (buyer scenario)
-		-- If DB file exists but key not in it → key was deleted by admin → reject
-		if isfile("ApexKeys.json") then return false end
-		return true
-	end
-	if type(e) ~= "table" then return true end
+	if not e then return false end
+	if type(e) ~= "table" then return false end
 	if e.frozen then return false end
 	if e.hwid and e.hwid ~= "" and e.hwid ~= getHWID() then return false end
 	return true
