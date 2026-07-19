@@ -155,47 +155,20 @@ end
 -- PERSISTENCE
 --===========================================================
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
-local KEYS_API = "https://api.github.com/repos/ddrasinx-cloud/DurkLoader/contents/keys.json"
 local _localMemDB = {}  -- session in-memory cache (survives writefile failures)
 
-local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local function b64decode(s)
-	s = s:gsub("%s+", "")
-	local out = {}; local o = 1
-	for i = 1, #s, 4 do
-		local a = (b64chars:find(s:sub(i, i)) or 1) - 1
-		local b = (b64chars:find(s:sub(i+1, i+1)) or 1) - 1
-		local c = (b64chars:find(s:sub(i+2, i+2)) or 1) - 1
-		local d = (b64chars:find(s:sub(i+3, i+3)) or 1) - 1
-		local n = a*262144 + b*4096 + c*64 + d
-		out[o] = string.char(math.floor(n/65536) % 256); o=o+1
-		if s:sub(i+2,i+2) ~= "=" then out[o] = string.char(math.floor(n/256) % 256); o=o+1 end
-		if s:sub(i+3,i+3) ~= "=" then out[o] = string.char(n % 256); o=o+1 end
+local function fetchKeys()
+	local cb = "?cb=" .. tostring(math.random(1e8, 1e9))
+	local body
+	local ok, b = pcall(game.HttpGet, game, KEYS_URL .. cb)
+	if ok and b then body = b end
+	if not body then
+		local ok2, b2 = pcall(HttpS.GetAsync, HttpS, KEYS_URL .. cb)
+		if ok2 and b2 then body = b2 end
 	end
-	return table.concat(out)
-end
-
-local function fetchGitHubAPI()
-	local ok, body = pcall(HttpS.GetAsync, HttpS, KEYS_API, true, {["User-Agent"] = "Roblox/Lua", ["Accept"] = "application/vnd.github.v3+json"})
-	if not ok or not body then
-		local ok2, body2 = pcall(game.HttpGet, game, KEYS_API)
-		if not ok2 or not body2 then return nil end
-		body = body2
-	end
-	local ok3, data = pcall(HttpS.JSONDecode, HttpS, body)
-	if not ok3 or type(data) ~= "table" or not data.content then return nil end
-	local raw = data.content:gsub("%s+", "")
-	local dec
-	if syn and syn.crypt and syn.crypt.decode then
-		local ok4, d = pcall(syn.crypt.decode, "base64", raw)
-		if ok4 and d then dec = d end
-	end
-	if not dec then
-		pcall(function() dec = b64decode(raw) end)
-	end
-	if not dec then return nil end
-	local ok5, t = pcall(HttpS.JSONDecode, HttpS, dec)
-	if ok5 and type(t) == "table" then return t end
+	if not body then return nil end
+	local ok3, t = pcall(HttpS.JSONDecode, HttpS, body)
+	if ok3 and type(t) == "table" then return t end
 	return nil
 end
 
@@ -208,7 +181,7 @@ local function loadKeyDB()
 			for k, v in pairs(t) do merged[k] = v end
 		end
 	end
-	local gh = fetchGitHubAPI()
+	local gh = fetchKeys()
 	if type(gh) == "table" then
 		for k, v in pairs(gh) do merged[k] = v end
 	end
@@ -219,9 +192,9 @@ local function saveKeyDB(t)
 	local enc = encryptDB(t)
 	if enc then pcall(function() writefile("FuryKeys.json", enc) end) end
 end
-local function fetchKeyFromGitHubDirect(key)
+local function fetchKeyDirect(key)
 	if not key then return nil end
-	local gh = fetchGitHubAPI()
+	local gh = fetchKeys()
 	if type(gh) == "table" and gh[key] then return gh[key] end
 	return nil
 end
@@ -304,7 +277,7 @@ function validateKey(k)
 	if not checksumMatch(k) then return false end
 	local db = loadKeyDB(); local e = db[k]
 	if not e then
-		e = fetchKeyFromGitHubDirect(k)
+		e = fetchKeyDirect(k)
 	end
 	if not e then return false end
 	if type(e) ~= "table" then return false end
