@@ -154,10 +154,48 @@ end
 -- PERSISTENCE
 --===========================================================
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
+local KEYS_API = "https://api.github.com/repos/ddrasinx-cloud/DurkLoader/contents/keys.json"
 local _localMemDB = {}  -- session in-memory cache (survives writefile failures)
+
+local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+local function b64decode(s)
+	s = s:gsub("%s+", "")
+	local out = {}; local o = 1
+	for i = 1, #s, 4 do
+		local a = (b64chars:find(s:sub(i, i)) or 1) - 1
+		local b = (b64chars:find(s:sub(i+1, i+1)) or 1) - 1
+		local c = (b64chars:find(s:sub(i+2, i+2)) or 1) - 1
+		local d = (b64chars:find(s:sub(i+3, i+3)) or 1) - 1
+		local n = a*262144 + b*4096 + c*64 + d
+		out[o] = string.char(math.floor(n/65536) % 256); o=o+1
+		if s:sub(i+2,i+2) ~= "=" then out[o] = string.char(math.floor(n/256) % 256); o=o+1 end
+		if s:sub(i+3,i+3) ~= "=" then out[o] = string.char(n % 256); o=o+1 end
+	end
+	return table.concat(out)
+end
+
+local function fetchGitHubAPI()
+	local ok, body = pcall(game.HttpGet, game, KEYS_API)
+	if not ok or not body then return nil end
+	local ok2, data = pcall(HttpS.JSONDecode, HttpS, body)
+	if not ok2 or type(data) ~= "table" or not data.content then return nil end
+	local raw = data.content:gsub("%s+", "")
+	local dec
+	if syn and syn.crypt and syn.crypt.decode then
+		local ok3, d = pcall(syn.crypt.decode, "base64", raw)
+		if ok3 and d then dec = d end
+	end
+	if not dec then
+		pcall(function() dec = b64decode(raw) end)
+	end
+	if not dec then return nil end
+	local ok4, t = pcall(HttpS.JSONDecode, HttpS, dec)
+	if ok4 and type(t) == "table" then return t end
+	return nil
+end
+
 local function loadKeyDB()
 	local merged = {}
-	-- Load local encrypted file first
 	local ok2, d2 = pcall(readfile, "FuryKeys.json")
 	if ok2 and d2 then
 		local t = decryptDB(d2)
@@ -165,31 +203,21 @@ local function loadKeyDB()
 			for k, v in pairs(t) do merged[k] = v end
 		end
 	end
-	-- Then load from GitHub (plain JSON — central freeze/delete enforced)
-	local ok, d = pcall(function()
-		local body = game:HttpGet(KEYS_URL)
-		return HttpS:JSONDecode(body)
-	end)
-	if ok and type(d) == "table" then
-		for k, v in pairs(d) do merged[k] = v end
+	local gh = fetchGitHubAPI()
+	if type(gh) == "table" then
+		for k, v in pairs(gh) do merged[k] = v end
 	end
 	return merged
 end
 local function saveKeyDB(t)
-	-- Always update in-memory cache (survives writefile failure)
 	for k, v in pairs(t) do _localMemDB[k] = v end
 	local enc = encryptDB(t)
 	if enc then pcall(function() writefile("FuryKeys.json", enc) end) end
 end
--- Direct GitHub fetch with cache busting (for validate fallback)
 local function fetchKeyFromGitHubDirect(key)
-	local ok, d = pcall(function()
-		local body = game:HttpGet(KEYS_URL .. "?t=" .. tostring(tick()))
-		local t = HttpS:JSONDecode(body)
-		if type(t) == "table" and t[key] then return t[key] end
-		return nil
-	end)
-	if ok and d then return d end
+	if not key then return nil end
+	local gh = fetchGitHubAPI()
+	if type(gh) == "table" and gh[key] then return gh[key] end
 	return nil
 end
 local function isAuthed()
