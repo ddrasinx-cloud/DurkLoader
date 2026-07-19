@@ -588,7 +588,7 @@ closeBtn.Text = "X"; closeBtn.TextColor3 = c3(180,180,190); closeBtn.Font = Enum
 closeBtn.Parent = tbar
 closeBtn.MouseEnter:Connect(function() pcall(function() TS:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = c3(200, 30, 60)}):Play() end) end)
 closeBtn.MouseLeave:Connect(function() pcall(function() TS:Create(closeBtn, TweenInfo.new(0.15), {TextColor3 = c3(180,180,190)}):Play() end) end)
-closeBtn.MouseButton1Click:Connect(function() mainGui.Enabled = false end)
+closeBtn.MouseButton1Click:Connect(function() showMenu = false; mainGui.Enabled = false end)
 
 -- Tab bar
 local TAB_NAMES = {"Combat", "Visuals", "Radar", "Settings"}
@@ -713,38 +713,46 @@ local function makeTab(name)
 		local arr = Instance.new("TextLabel")
 		arr.BackgroundTransparency = 1; arr.Size = UDim2.new(0, 16, 1, 0); arr.Position = UDim2.new(1, -16, 0, 0)
 		arr.Text = ">"; arr.TextColor3 = C_DM; arr.Font = Enum.Font.Gotham; arr.TextSize = 11; arr.Parent = dbtn
-		local open = false; local list
+		local open = false; local list; local dropOverlay
+		local function closeDrop()
+			open = false; arr.Text = ">"
+			if list then list:Destroy(); list = nil end
+			if dropOverlay then dropOverlay:Destroy(); dropOverlay = nil end
+		end
 		dbtn.MouseButton1Click:Connect(function()
-			open = not open
-			if open then
-				if list then list:Destroy() end
-				list = Instance.new("Frame"); list.BackgroundColor3 = c3(22, 20, 28); list.BorderSizePixel = 0
-				list.Size = UDim2.new(0, 130, 0, #opts * 24); list.Position = UDim2.new(1, -136, 1, 2); list.Parent = b
-				pcall(function() Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4) end)
-				local lbdr = Instance.new("UIStroke")
-				lbdr.Color = c3(60, 55, 68); lbdr.Thickness = 1; lbdr.Transparency = 0.4; pcall(function() lbdr.Parent = list end)
-				for i, opt in ipairs(opts) do
-					local o = Instance.new("TextButton"); o.BackgroundColor3 = opt == get() and c3(35, 30, 42) or c3(22, 20, 28); o.BorderSizePixel = 0
-					o.Size = UDim2.new(1, 0, 0, 24); o.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
-					o.Text = ""; o.Parent = list
-					pcall(function() Instance.new("UICorner", o).CornerRadius = UDim.new(0, 3) end)
-					o.MouseEnter:Connect(function()
-						pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = c3(45, 38, 52)}):Play() end)
-					end)
-					o.MouseLeave:Connect(function()
-						local tg = opt == get() and c3(35, 30, 42) or c3(22, 20, 28)
-						pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = tg}):Play() end)
-					end)
-					local otxt = Instance.new("TextLabel")
-					otxt.BackgroundTransparency = 1; otxt.Size = UDim2.new(1, -10, 1, 0); otxt.Position = UDim2.new(0, 8, 0, 0)
-					otxt.Text = opt; otxt.TextColor3 = opt == get() and C_AC or c3(190, 190, 200); otxt.Font = Enum.Font.Gotham; otxt.TextSize = 12
-					otxt.TextXAlignment = Enum.TextXAlignment.Left; otxt.Parent = o
-					o.MouseButton1Click:Connect(function()
-						set(opt); dtxt.Text = opt; arr.Text = ">"; open = false; list:Destroy(); saveCfg()
-					end)
-				end
-				arr.Text = "v"
-			else if list then list:Destroy(); arr.Text = ">" end end
+			if open then closeDrop(); return end
+			open = true
+			-- overlay to catch clicks outside dropdown
+			dropOverlay = Instance.new("TextButton"); dropOverlay.BackgroundTransparency = 1; dropOverlay.BorderSizePixel = 0; dropOverlay.Size = UDim2.new(1, 0, 1, 0); dropOverlay.Position = UDim2.new(0, 0, 0, 0); dropOverlay.Text = ""; dropOverlay.ZIndex = 0; dropOverlay.Parent = box
+			dropOverlay.MouseButton1Click:Connect(closeDrop)
+			if list then list:Destroy() end
+			list = Instance.new("Frame"); list.BackgroundColor3 = c3(22, 20, 28); list.BorderSizePixel = 0
+			list.Size = UDim2.new(0, 130, 0, #opts * 24); list.Position = UDim2.new(1, -136, 1, 2); list.Parent = b
+			pcall(function() Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4) end)
+			local lbdr = Instance.new("UIStroke")
+			lbdr.Color = c3(60, 55, 68); lbdr.Thickness = 1; lbdr.Transparency = 0.4; pcall(function() lbdr.Parent = list end)
+			for i, opt in ipairs(opts) do
+				local o = Instance.new("TextButton"); o.BackgroundColor3 = opt == get() and c3(35, 30, 42) or c3(22, 20, 28); o.BorderSizePixel = 0
+				o.Size = UDim2.new(1, 0, 0, 24); o.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
+				o.Text = ""; o.Parent = list
+				pcall(function() Instance.new("UICorner", o).CornerRadius = UDim.new(0, 3) end)
+				o.MouseEnter:Connect(function()
+					pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = c3(45, 38, 52)}):Play() end)
+				end)
+				o.MouseLeave:Connect(function()
+					local tg = opt == get() and c3(35, 30, 42) or c3(22, 20, 28)
+					pcall(function() TS:Create(o, TweenInfo.new(0.12), {BackgroundColor3 = tg}):Play() end)
+				end)
+				local otxt = Instance.new("TextLabel")
+				otxt.BackgroundTransparency = 1; otxt.Size = UDim2.new(1, -10, 1, 0); otxt.Position = UDim2.new(0, 8, 0, 0)
+				otxt.Text = opt; otxt.TextColor3 = opt == get() and C_AC or c3(190, 190, 200); otxt.Font = Enum.Font.Gotham; otxt.TextSize = 12
+				otxt.TextXAlignment = Enum.TextXAlignment.Left; otxt.Parent = o
+				o.MouseButton1Click:Connect(function()
+					set(opt); dtxt.Text = opt; arr.Text = ">"; open = false; list:Destroy(); saveCfg()
+					if dropOverlay then dropOverlay:Destroy(); dropOverlay = nil end
+				end)
+			end
+			arr.Text = "v"
 		end); return b
 	end
 	function L.btn(t, cb)
@@ -799,6 +807,7 @@ for i, name in ipairs(TAB_NAMES) do
 		L.Y = L.Y + 2; L.lbl("-- ZOOM SETTINGS --")
 		L.drop("Zoom Key", function() return cfg.zoomKey end, function(v) cfg.zoomKey = v end, {"Z", "X", "C", "LeftShift", "LeftControl", "MouseButton2"})
 		L.sldr("Zoom FOV", function() return cfg.zoomFOV end, function(v) cfg.zoomFOV = v end, 10, 80)
+		local zhint = Instance.new("TextLabel"); zhint.BackgroundTransparency = 1; zhint.Size = UDim2.new(1, -10, 0, 16); zhint.Position = UDim2.new(0, 5, 0, L.Y); zhint.Text = "Hold selected key to zoom"; zhint.TextColor3 = c3(110, 110, 120); zhint.Font = Enum.Font.Gotham; zhint.TextSize = 10; zhint.TextXAlignment = Enum.TextXAlignment.Center; zhint.Parent = box; L.Y = L.Y + 18
 		L.Y = L.Y + 2; L.lbl("-- CONFIG --")
 		L.btn("Save Config", saveCfg)
 		L.btn("Load Config", function() loadCfg(); print("[Fury] Config loaded.") end)
