@@ -828,7 +828,7 @@ local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Fury_Key"; keyGui.Reset
 local kOverlay = Instance.new("Frame"); kOverlay.BackgroundColor3 = c3(0, 0, 0); kOverlay.BorderSizePixel = 0; kOverlay.Size = UDim2.new(1, 0, 1, 0); kOverlay.BackgroundTransparency = 0.5; kOverlay.ZIndex = 0; pcall(function() kOverlay.Parent = keyGui end)
 local function mkGrad(bg, c1, c2)
 	pcall(function()
-		local g = Instance.new("UIGradient"); g.Color = ColorSequence.new{c1, c2}; g.Parent = bg
+		local g = Instance.new("UIGradient"); g.Color = ColorSequence.new(c1, c2); g.Parent = bg
 	end)
 end
 local kf = Instance.new("Frame")
