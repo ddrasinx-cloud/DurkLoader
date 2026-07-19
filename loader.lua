@@ -60,7 +60,8 @@ local function saveKeyDB(t)
 	pcall(function() writefile("FuryKeys.json", HttpS:JSONEncode(t)) end)
 end
 local function isAuthed()
-	return pcall(isfile, "FuryAuth.json") and pcall(readfile, "FuryAuth.json") == "1"
+	local ok, data = pcall(readfile, "FuryAuth.json")
+	return ok and data == "1"
 end
 local function setAuthed(v)
 	pcall(function() writefile("FuryAuth.json", v and "1" or "0") end)
@@ -507,9 +508,6 @@ local function makeTab(name)
 				end
 				arr.Text = "v"
 			else if list then list:Destroy(); arr.Text = ">" end end
-		end); return b
-	end
-			else if list then list:Destroy() end end
 		end); return b
 	end
 	function L.btn(t, cb)
@@ -993,16 +991,6 @@ hook(RunS.RenderStepped:Connect(function(dt)
 		f3Down = false
 	end
 	doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
-	-- lava animation
-	local fw, fh = 380, 520
-	for _, p in ipairs(lavP) do
-		local x, y = p.o.Position.X.Offset, p.o.Position.Y.Offset
-		y = y + p.sp * dt * 60
-		x = x + math.sin(p.ph + tick() * p.ss) * p.sw
-		if y > fh + 10 then y = -10 - ri(0, 100); x = ri(-10, fw + 10) end
-		p.o.Position = UDim2.new(0, x, 0, y)
-	end
-
 end))
 
 --===========================================================
