@@ -544,7 +544,7 @@ tbar.Parent = frm
 
 local ttl = Instance.new("TextLabel")
 ttl.BackgroundTransparency = 1; ttl.Size = UDim2.new(1, -40, 1, 0); ttl.Position = UDim2.new(0, 14, 0, 0)
-ttl.Text = "FURY  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
+ttl.Text = "APEX  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
 ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.Parent = tbar
 
 -- Pulsing title glow
@@ -869,7 +869,7 @@ pcall(function()
 end)
 local khT = Instance.new("TextLabel")
 khT.BackgroundTransparency = 1; khT.Size = UDim2.new(1, -20, 1, 0); khT.Position = UDim2.new(0, 12, 0, 0)
-khT.Text = "FURY  1.0"; khT.TextColor3 = c3(200, 30, 60); khT.Font = Enum.Font.GothamBold; khT.TextSize = 16; khT.TextXAlignment = Enum.TextXAlignment.Left; khT.Parent = kh
+khT.Text = "APEX  1.0"; khT.TextColor3 = c3(200, 30, 60); khT.Font = Enum.Font.GothamBold; khT.TextSize = 16; khT.TextXAlignment = Enum.TextXAlignment.Left; khT.Parent = kh
 local khS = Instance.new("TextLabel")
 khS.BackgroundTransparency = 1; khS.Size = UDim2.new(1, -20, 1, 0); khS.Position = UDim2.new(0, 12, 0, 0)
 khS.Text = "License Authentication"; khS.TextColor3 = c3(140, 140, 150); khS.Font = Enum.Font.Gotham; khS.TextSize = 10; khS.TextXAlignment = Enum.TextXAlignment.Right; khS.TextYAlignment = Enum.TextYAlignment.Bottom; khS.Parent = kh
@@ -1289,13 +1289,12 @@ end))
 
 hook(RunS.RenderStepped:Connect(function(dt)
 	if dead then return end
-	-- F3 secondary check (poll)
 	if UIS:IsKeyDown(Enum.KeyCode.F3) then
 		if not f3Down then f3Down = true; cfg.esp = not cfg.esp; saveCfg() end
 	else
 		f3Down = false
 	end
-	doFullbright(); doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
+	pcall(doFullbright); pcall(doESP); pcall(drawFOV); pcall(doAim); pcall(doZoom); pcall(doRadar); pcall(drawCrosshair); pcall(drawWatermark)
 end))
 
 --===========================================================
@@ -1316,7 +1315,7 @@ _LD.GenKey = function(duration)
 	saveKeyDB(db)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
 	print("+-------------------------------------------+")
-	print("|              FURY LICENSE KEY              |")
+	print("|              APEX LICENSE KEY               |")
 	print("+-------------------------------------------+")
 	print("| " .. k .. " |")
 	print("|  Expires: " .. expStr .. "  (" .. duration .. ")")
