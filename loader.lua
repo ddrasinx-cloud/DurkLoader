@@ -226,6 +226,9 @@ local cfg = {
 	rOpacity = 0.5,
 	watermark = true,
 	crosshair = false,
+	zoom = false,
+	zoomKey = "Z",
+	zoomFOV = 40,
 }
 local function saveCfg()
 	pcall(function() writefile("FuryCfg.json", HttpS:JSONEncode(cfg)) end)
@@ -555,6 +558,10 @@ for i, name in ipairs(TAB_NAMES) do
 		L.sldr("Opacity", function() return cfg.rOpacity end, function(v) cfg.rOpacity = rnd(v, 2) end, 0, 1)
 	elseif name == "Settings" then
 		L.tog("Watermark", function() return cfg.watermark end, function(v) cfg.watermark = v end)
+		L.tog("Zoom", function() return cfg.zoom end, function(v) cfg.zoom = v end)
+		L.Y = L.Y + 2; L.lbl("-- ZOOM SETTINGS --")
+		L.drop("Zoom Key", function() return cfg.zoomKey end, function(v) cfg.zoomKey = v end, {"Z", "X", "C", "LeftShift", "LeftControl", "MouseButton2"})
+		L.sldr("Zoom FOV", function() return cfg.zoomFOV end, function(v) cfg.zoomFOV = v end, 10, 80)
 		L.Y = L.Y + 2; L.lbl("-- CONFIG --")
 		L.btn("Save Config", saveCfg)
 		L.btn("Load Config", function() loadCfg(); print("[Fury] Config loaded.") end)
@@ -874,6 +881,30 @@ local function doAim()
 	end
 end
 
+-- Zoom
+local defaultFOV = cam.FieldOfView
+local function doZoom()
+	if not cfg.zoom or panicked or dead or not _authed then
+		cam.FieldOfView = defaultFOV; return
+	end
+	local held = false
+	local zk = cfg.zoomKey
+	if zk == "MouseButton2" then
+		held = pcall(function() return UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) end)
+	elseif zk == "LeftControl" then
+		held = UIS:IsKeyDown(Enum.KeyCode.LeftControl)
+	elseif zk == "LeftShift" then
+		held = UIS:IsKeyDown(Enum.KeyCode.LeftShift)
+	elseif zk == "Z" then
+		held = UIS:IsKeyDown(Enum.KeyCode.Z)
+	elseif zk == "X" then
+		held = UIS:IsKeyDown(Enum.KeyCode.X)
+	elseif zk == "C" then
+		held = UIS:IsKeyDown(Enum.KeyCode.C)
+	end
+	cam.FieldOfView = held and cfg.zoomFOV or defaultFOV
+end
+
 local function drawFOV()
 	if not cfg.aimbot or panicked or dead or not _authed then fovC.Visible = false; return end
 	local vs = cam.ViewportSize; local fp = cfg.fov * (vs.X / 1920) * 2.5
@@ -961,7 +992,7 @@ hook(RunS.RenderStepped:Connect(function(dt)
 	else
 		f3Down = false
 	end
-	doESP(); drawFOV(); doAim(); doRadar(); drawCrosshair(); drawWatermark()
+	doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
 	-- lava animation
 	local fw, fh = 380, 520
 	for _, p in ipairs(lavP) do
@@ -991,9 +1022,14 @@ _LD.GenKey = function(duration)
 	saveKeyDB(db)
 	sendWebhook(k, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
-	print("=== Fury KEY ==="); print(k)
-	print("Expires: " .. expStr .. "  (" .. duration .. ")")
-	print("====================")
+	print("+-------------------------------------------+")
+	print("|              FURY LICENSE KEY              |")
+	print("+-------------------------------------------+")
+	print("| " .. k .. " |")
+	print("|  Expires: " .. expStr .. "  (" .. duration .. ")")
+	print("+-------------------------------------------+")
+	print("| loadstring: copy from Discord delivery    |")
+	print("+-------------------------------------------+")
 	return k, expires
 end
 _LD.ListKeys = function()
