@@ -166,6 +166,15 @@ local function fetchKeys()
 		local ok2, b2 = pcall(HttpS.GetAsync, HttpS, KEYS_URL .. cb)
 		if ok2 and b2 then body = b2 end
 	end
+	if not body then
+		pcall(function() local r = syn.request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
+	end
+	if not body then
+		pcall(function() local r = request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
+	end
+	if not body then
+		pcall(function() local r = http_request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
+	end
 	if not body then return nil end
 	local ok3, t = pcall(HttpS.JSONDecode, HttpS, body)
 	if ok3 and type(t) == "table" then return t end
