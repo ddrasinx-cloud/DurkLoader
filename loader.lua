@@ -226,27 +226,9 @@ local cfg = {
 	rOpacity = 0.5,
 	watermark = true,
 	crosshair = false,
-	noRecoil = false,
 }
--- No recoil hook (CFrame.Angles)
-local noRecoilActive = false
-local CFrame_Angles_hooked
-do
-	local orig = CFrame.Angles
-	CFrame_Angles_hooked = hookfunction(orig, newcclosure(function(...)
-		if noRecoilActive then
-			local tb = debug.traceback()
-			if tb:find("Update") and (tb:find("ToolTemplate") or tb:find("GunTemplate")) then
-				return CFrame.identity
-			end
-		end
-		return orig(...)
-	end))
-end
-
 local function saveCfg()
 	pcall(function() writefile("ApexCfg.json", HttpS:JSONEncode(cfg)) end)
-	noRecoilActive = cfg.noRecoil
 end
 local function loadCfg()
 	pcall(function()
@@ -256,7 +238,6 @@ local function loadCfg()
 			if type(t) == "table" then for k, v in pairs(t) do cfg[k] = v end end
 		end
 	end)
-	noRecoilActive = cfg.noRecoil
 end
 loadCfg()
 
@@ -528,7 +509,6 @@ for i, name in ipairs(TAB_NAMES) do
 	tabFrames[i] = box
 	if name == "Combat" then
 		L.tog("Aimbot", function() return cfg.aimbot end, function(v) cfg.aimbot = v end)
-		L.tog("No Recoil", function() return cfg.noRecoil end, function(v) cfg.noRecoil = v; noRecoilActive = v; saveCfg() end)
 		L.tog("Triggerbot", function() return cfg.triggerbot end, function(v) cfg.triggerbot = v end)
 		L.Y = L.Y + 2; L.lbl("-- AIMBOT SETTINGS --")
 		L.sldr("FOV", function() return cfg.fov end, function(v) cfg.fov = v end, 10, 180)
