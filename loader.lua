@@ -50,11 +50,22 @@ local function deriveKey()
 	local h = 0; for i = 1, #raw do h = (h * 31 + string.byte(raw, i)) % 2^32 end
 	return tostring(h):rep(8):sub(1, 32)
 end
+local function bxor(a, b)
+	local r = 0; local p = 1
+	while a > 0 or b > 0 do
+		local ab = a % 2; local bb = b % 2
+		if ab ~= bb then r = r + p end
+		a = (a - ab) / 2; b = (b - bb) / 2; p = p * 2
+	end
+	return r
+end
 local function xorEncrypt(data, key)
 	local out = {}; local ki = 1
 	for i = 1, #data do
-		local b = string.byte(data, i) ~ string.byte(key, ki)
-		out[i] = string.char(b)
+		pcall(function()
+			local a = string.byte(data, i); local b = string.byte(key, ki)
+			out[i] = string.char(bxor(a, b))
+		end)
 		ki = ki + 1; if ki > #key then ki = 1 end
 	end
 	return table.concat(out)
