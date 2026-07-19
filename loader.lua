@@ -155,25 +155,35 @@ end
 -- PERSISTENCE
 --===========================================================
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json"
-local _localMemDB = {}  -- session in-memory cache (survives writefile failures)
+local KEYS_API = "https://api.github.com/repos/ddrasinx-cloud/DurkLoader/contents/keys.json"
+local _localMemDB = {}
 
 local function fetchKeys()
 	local cb = "?cb=" .. tostring(math.random(1e8, 1e9))
 	local body
-	local ok, b = pcall(game.HttpGet, game, KEYS_URL .. cb)
-	if ok and b then body = b end
-	if not body then
-		local ok2, b2 = pcall(HttpS.GetAsync, HttpS, KEYS_URL .. cb)
-		if ok2 and b2 then body = b2 end
+	local reqs = {
+		function() return game:HttpGet(KEYS_URL .. cb) end,
+		function() return HttpS:GetAsync(KEYS_URL .. cb) end,
+	}
+	for _, f in ipairs(reqs) do
+		local ok, b = pcall(f)
+		if ok and b and #b > 0 then body = b; break end
 	end
 	if not body then
-		pcall(function() local r = syn.request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
+		local tries = {syn.request, request, http_request}
+		for _, fn in ipairs(tries) do
+			pcall(function()
+				local r = fn({Url=KEYS_URL .. cb, Method="GET"})
+				if r and r.StatusCode == 200 and r.Body and #r.Body > 0 then body = r.Body end
+			end)
+			if body then break end
+		end
 	end
 	if not body then
-		pcall(function() local r = request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
-	end
-	if not body then
-		pcall(function() local r = http_request({Url=KEYS_URL .. cb, Method="GET"}); if r and r.StatusCode == 200 and r.Body then body = r.Body end end)
+		pcall(function()
+			local r = request({Url=KEYS_API, Method="GET", Headers={Accept="application/vnd.github.v3.raw"}})
+			if r and r.StatusCode == 200 and r.Body and #r.Body > 0 then body = r.Body end
+		end)
 	end
 	if not body then return nil end
 	local ok3, t = pcall(HttpS.JSONDecode, HttpS, body)
@@ -1302,13 +1312,15 @@ hook(UIS.InputBegan:Connect(function(input, gpe)
 end))
 
 hook(RunS.RenderStepped:Connect(function(dt)
-	if dead then return end
-	if UIS:IsKeyDown(Enum.KeyCode.F3) then
-		if not f3Down then f3Down = true; cfg.esp = not cfg.esp; saveCfg() end
-	else
-		f3Down = false
-	end
-	pcall(doFullbright); pcall(doESP); pcall(drawFOV); pcall(doAim); pcall(doZoom); pcall(doRadar); pcall(drawCrosshair); pcall(drawWatermark)
+	pcall(function()
+		if dead then return end
+		if UIS:IsKeyDown(Enum.KeyCode.F3) then
+			if not f3Down then f3Down = true; cfg.esp = not cfg.esp; saveCfg() end
+		else
+			f3Down = false
+		end
+		doFullbright(); doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
+	end)
 end))
 
 --===========================================================
