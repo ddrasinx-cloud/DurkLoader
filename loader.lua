@@ -1,5 +1,5 @@
 --===========================================================
--- Apex 1.0  |  Key System + ESP + Aimbot + Radar
+-- Fury 1.0  |  Key System + ESP + Aimbot + Radar
 --===========================================================
 local Services = setmetatable({}, {__index = function(s,k)
 	local ok, v = pcall(game.GetService, game, k)
@@ -49,7 +49,7 @@ local function loadKeyDB()
 	end)
 	if ok and type(d) == "table" then return d end
 	-- Fallback to local file
-	local ok2, d2 = pcall(readfile, "ApexKeys.json")
+	local ok2, d2 = pcall(readfile, "FuryKeys.json")
 	if ok2 and d2 then
 		local ok3, t = pcall(HttpS.JSONDecode, HttpS, d2)
 		if ok3 and type(t) == "table" then return t end
@@ -57,13 +57,13 @@ local function loadKeyDB()
 	return {}
 end
 local function saveKeyDB(t)
-	pcall(function() writefile("ApexKeys.json", HttpS:JSONEncode(t)) end)
+	pcall(function() writefile("FuryKeys.json", HttpS:JSONEncode(t)) end)
 end
 local function isAuthed()
-	return pcall(isfile, "ApexAuth.json") and pcall(readfile, "ApexAuth.json") == "1"
+	return pcall(isfile, "FuryAuth.json") and pcall(readfile, "FuryAuth.json") == "1"
 end
 local function setAuthed(v)
-	pcall(function() writefile("ApexAuth.json", v and "1" or "0") end)
+	pcall(function() writefile("FuryAuth.json", v and "1" or "0") end)
 end
 local keyDB = loadKeyDB()
 local _authed = isAuthed()  -- in-memory auth flag (render gates)
@@ -148,9 +148,9 @@ end
 local WH_URL = "https://discord.com/api/webhooks/1528481174241018008/Lq3PtajZvhxWfVa8gmdWse29idKNnyVW4tr9WAKyOQ0e2c-fBuzsvjz2rsA4Zid3BRzO"
 local function sendWebhook(key, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
-	local buyerMsg = ">>> **Thank you for purchasing Apex Software!** 🎉\n```\n" .. key .. "\n```\n📅 Expires: " .. expStr .. "\n\n**Instructions:**\n1️⃣ Load the script in your executor\n2️⃣ Enter your license key\n3️⃣ Press RightShift to open the menu\n4️⃣ Configure and enjoy!"
+	local buyerMsg = ">>> **Thank you for purchasing Fury Software!** 🎉\n```\n" .. key .. "\n```\n📅 Expires: " .. expStr .. "\n\n**Instructions:**\n1️⃣ Load the script in your executor\n2️⃣ Enter your license key\n3️⃣ Press RightShift to open the menu\n4️⃣ Configure and enjoy!"
 	local data = {embeds = {{
-		title = "Apex Software — New License",
+		title = "Fury Software — New License",
 		color = 0xc83250,
 		fields = {
 			{name = "License Key", value = "```\n" .. key .. "\n```", inline = false},
@@ -159,7 +159,7 @@ local function sendWebhook(key, expires, duration)
 			{name = "📋 Copy & Send to Buyer", value = buyerMsg, inline = false},
 			{name = "🔗 Support Discord", value = "[Click to join](https://discord.gg/sAW47m2UcK)", inline = true}
 		},
-		footer = {text = "Apex 1.0 | All sales are recorded"}
+		footer = {text = "Fury 1.0 | All sales are recorded"}
 	}}}
 	local body = HttpS:JSONEncode(data)
 	local ok
@@ -168,7 +168,7 @@ local function sendWebhook(key, expires, duration)
 	if not ok then ok = pcall(function() http_request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end) end
 	print("")
 	print("=== COPY & SEND TO BUYER ===")
-	print("Thanks for purchasing Apex Software!")
+	print("Thanks for purchasing Fury Software!")
 	print("Key: " .. key)
 	print("Expires: " .. expStr)
 	print("1. Load the script")
@@ -185,7 +185,7 @@ local function sendHWIDWebhook(key, hwid)
 	local db = loadKeyDB(); local e = db[key]
 	if not e then return end
 	local data = {embeds = {{
-		title = "Apex Software — HWID Bound",
+		title = "Fury Software — HWID Bound",
 		color = 0x4080e0,
 		fields = {
 			{name = "License Key", value = "```\n" .. key .. "\n```", inline = false},
@@ -193,7 +193,7 @@ local function sendHWIDWebhook(key, hwid)
 			{name = "Status", value = "✅ Bound & Active", inline = true},
 			{name = "Expires", value = os.date("%Y-%m-%d %H:%M", e.expires) .. " (" .. e.duration .. ")", inline = false}
 		},
-		footer = {text = "Apex 1.0 | HWID auto-recorded"}
+		footer = {text = "Fury 1.0 | HWID auto-recorded"}
 	}}}
 	local body = HttpS:JSONEncode(data)
 	pcall(function() syn.request({Url = WH_URL, Method = "POST", Headers = {["Content-Type"] = "application/json"}, Body = body}) end)
@@ -217,7 +217,7 @@ local cfg = {
 	rRadius = 300,
 	triggerbot = false,
 	triggerDelay = 100,
-	aimKey = "RightShift",
+	aimKey = "Always",
 	maxDist = 1200,
 	boxStyle = "2D",
 	tracerPos = "Bottom",
@@ -228,12 +228,12 @@ local cfg = {
 	crosshair = false,
 }
 local function saveCfg()
-	pcall(function() writefile("ApexCfg.json", HttpS:JSONEncode(cfg)) end)
+	pcall(function() writefile("FuryCfg.json", HttpS:JSONEncode(cfg)) end)
 end
 local function loadCfg()
 	pcall(function()
-		if isfile("ApexCfg.json") then
-			local d = readfile("ApexCfg.json")
+		if isfile("FuryCfg.json") then
+			local d = readfile("FuryCfg.json")
 			local t = HttpS:JSONDecode(d)
 			if type(t) == "table" then for k, v in pairs(t) do cfg[k] = v end end
 		end
@@ -252,10 +252,11 @@ local function mkDr(t)
 	if Dr_OK then return Drawing.new(t) end
 	return setmetatable({}, {__index = function() return function() end end})
 end
-if not Dr_OK then warn("[Apex] Drawing API unavailable — visuals disabled.") end
+if not Dr_OK then warn("[Fury] Drawing API unavailable — visuals disabled.") end
 for _ = 1, POOL_SZ do
 	local b = {}
 	for _, k in ipairs({"t", "b", "l", "r"}) do b[k] = mkDr("Line"); b[k].Thickness = cfg.boxThick; b[k].ZIndex = 999 end
+	for _, k in ipairs({"t_", "b_", "l_", "r_"}) do b[k] = mkDr("Line"); b[k].Thickness = 0.5; b[k].ZIndex = 998 end
 	local n = mkDr("Text"); n.Size = 14; n.Outline = true; n.Center = true; n.ZIndex = 999
 	local h = mkDr("Text"); h.Size = 12; h.Outline = true; h.Center = true; h.ZIndex = 999
 	local d = mkDr("Text"); d.Size = 11; d.Outline = true; d.Center = true; d.ZIndex = 999
@@ -266,7 +267,7 @@ end
 pool.skel = {}
 for _ = 1, POOL_SZ do
 	local s = {}
-	for i = 1, #SKEL_CONNS do s[i] = mkDr("Line"); s[i].Thickness = 1; s[i].ZIndex = 999 end
+	for i = 1, #SKEL_CONNS do s[i] = mkDr("Line"); s[i].Thickness = 1.5; s[i].ZIndex = 999 end
 	table.insert(pool.skel, s)
 end
 
@@ -324,14 +325,14 @@ local function nuke()
 	pool = nil; mainGui = nil; _LD = nil
 	local env = getfenv()
 	for k, _ in pairs(env) do if type(k) == "string" and k:sub(1, 1) == "_" then env[k] = nil end end
-	pcall(warn, "[Apex] Nuked. F3 clean exit.")
+	pcall(warn, "[Fury] Nuked. F3 clean exit.")
 end
 
 --===========================================================
--- GUI  (Apex — dark red carbon)
+-- GUI  (Fury — dark red carbon)
 --===========================================================
 local mainGui = Instance.new("ScreenGui")
-mainGui.Name = "Apex_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = false; mainGui.DisplayOrder = 999
+mainGui.Name = "Fury_Menu"; mainGui.ResetOnSpawn = false; mainGui.Enabled = false; mainGui.DisplayOrder = 999
 local parent = CoreGui or lp:FindFirstChildOfClass("PlayerGui")
 pcall(function() mainGui.Parent = parent end)
 
@@ -356,7 +357,7 @@ tbar.Parent = frm
 
 local ttl = Instance.new("TextLabel")
 ttl.BackgroundTransparency = 1; ttl.Size = UDim2.new(1, -40, 1, 0); ttl.Position = UDim2.new(0, 14, 0, 0)
-ttl.Text = "APEX  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
+ttl.Text = "FURY  1.0"; ttl.TextColor3 = C_AC; ttl.Font = Enum.Font.GothamBold; ttl.TextSize = 17
 ttl.TextXAlignment = Enum.TextXAlignment.Left; ttl.Parent = tbar
 
 -- Accent line under title bar
@@ -464,26 +465,47 @@ local function makeTab(name)
 		lb.Text = t; lb.TextColor3 = C_TX; lb.Font = Enum.Font.Gotham; lb.TextSize = 13
 		lb.TextXAlignment = Enum.TextXAlignment.Left; lb.Parent = b
 		local dbtn = Instance.new("TextButton")
-		dbtn.BackgroundColor3 = c3(40, 38, 45); dbtn.BorderSizePixel = 0
-		dbtn.Size = UDim2.new(0, 120, 0, 22); dbtn.Position = UDim2.new(1, -130, 0.5, -11)
-		dbtn.Text = get(); dbtn.TextColor3 = C_TX; dbtn.Font = Enum.Font.Gotham; dbtn.TextSize = 12; dbtn.Parent = b
+		dbtn.BackgroundColor3 = c3(45, 42, 50); dbtn.BorderSizePixel = 0
+		dbtn.Size = UDim2.new(0, 130, 0, 24); dbtn.Position = UDim2.new(1, -136, 0.5, -12)
+		dbtn.Text = ""; dbtn.Parent = b
 		pcall(function() Instance.new("UICorner", dbtn).CornerRadius = UDim.new(0, 4) end)
+		dbtn.MouseEnter:Connect(function() dbtn.BackgroundColor3 = c3(55, 52, 60) end)
+		dbtn.MouseLeave:Connect(function() dbtn.BackgroundColor3 = c3(45, 42, 50) end)
+		local dtxt = Instance.new("TextLabel")
+		dtxt.BackgroundTransparency = 1; dtxt.Size = UDim2.new(1, -18, 1, 0); dtxt.Position = UDim2.new(0, 8, 0, 0)
+		dtxt.Text = get(); dtxt.TextColor3 = C_TX; dtxt.Font = Enum.Font.Gotham; dtxt.TextSize = 12
+		dtxt.TextXAlignment = Enum.TextXAlignment.Left; dtxt.Parent = dbtn
+		local arr = Instance.new("TextLabel")
+		arr.BackgroundTransparency = 1; arr.Size = UDim2.new(0, 16, 1, 0); arr.Position = UDim2.new(1, -16, 0, 0)
+		arr.Text = ">"; arr.TextColor3 = C_DM; arr.Font = Enum.Font.Gotham; arr.TextSize = 11; arr.Parent = dbtn
 		local open = false; local list
 		dbtn.MouseButton1Click:Connect(function()
 			open = not open
 			if open then
 				if list then list:Destroy() end
-				list = Instance.new("Frame"); list.BackgroundColor3 = c3(35, 33, 40); list.BorderSizePixel = 0
-				list.Size = UDim2.new(0, 120, 0, #opts * 24); list.Position = UDim2.new(1, -130, 1, 2); list.Parent = b
+				list = Instance.new("Frame"); list.BackgroundColor3 = c3(28, 26, 32); list.BorderSizePixel = 0
+				list.Size = UDim2.new(0, 130, 0, #opts * 24); list.Position = UDim2.new(1, -136, 1, 2); list.Parent = b
 				pcall(function() Instance.new("UICorner", list).CornerRadius = UDim.new(0, 4) end)
+				local lbdr = Instance.new("UIStroke")
+				lbdr.Color = c3(60, 55, 65); lbdr.Thickness = 1; lbdr.Transparency = 0.5; pcall(function() lbdr.Parent = list end)
 				for i, opt in ipairs(opts) do
-					local o = Instance.new("TextButton"); o.BackgroundColor3 = c3(35, 33, 40); o.BorderSizePixel = 0
+					local o = Instance.new("TextButton"); o.BackgroundColor3 = opt == get() and c3(40, 35, 45) or c3(28, 26, 32); o.BorderSizePixel = 0
 					o.Size = UDim2.new(1, 0, 0, 24); o.Position = UDim2.new(0, 0, 0, (i - 1) * 24)
-					o.Text = opt; o.TextColor3 = opt == get() and C_AC or C_TX; o.Font = Enum.Font.Gotham; o.TextSize = 12; o.Parent = list
+					o.Text = ""; o.Parent = list
+					o.MouseEnter:Connect(function() o.BackgroundColor3 = c3(45, 40, 50) end)
+					o.MouseLeave:Connect(function() o.BackgroundColor3 = opt == get() and c3(40, 35, 45) or c3(28, 26, 32) end)
+					local otxt = Instance.new("TextLabel")
+					otxt.BackgroundTransparency = 1; otxt.Size = UDim2.new(1, -10, 1, 0); otxt.Position = UDim2.new(0, 8, 0, 0)
+					otxt.Text = opt; otxt.TextColor3 = opt == get() and C_AC or C_TX; otxt.Font = Enum.Font.Gotham; otxt.TextSize = 12
+					otxt.TextXAlignment = Enum.TextXAlignment.Left; otxt.Parent = o
 					o.MouseButton1Click:Connect(function()
-						set(opt); dbtn.Text = opt; open = false; list:Destroy(); saveCfg()
+						set(opt); dtxt.Text = opt; arr.Text = ">"; open = false; list:Destroy(); saveCfg()
 					end)
 				end
+				arr.Text = "v"
+			else if list then list:Destroy(); arr.Text = ">" end end
+		end); return b
+	end
 			else if list then list:Destroy() end end
 		end); return b
 	end
@@ -518,7 +540,7 @@ for i, name in ipairs(TAB_NAMES) do
 		L.tog("Crosshair", function() return cfg.crosshair end, function(v) cfg.crosshair = v end)
 		L.tog("Stream Mode", function() return cfg.stream end, function(v)
 			cfg.stream = v
-			print("[Apex] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
+			print("[Fury] Stream mode " .. (v and "ON — OBS bypass active" or "OFF"))
 		end)
 		L.Y = L.Y + 2; L.lbl("-- ESP SETTINGS --")
 		L.sldr("Max Distance", function() return cfg.maxDist end, function(v) cfg.maxDist = v end, 200, 2000)
@@ -535,9 +557,9 @@ for i, name in ipairs(TAB_NAMES) do
 		L.tog("Watermark", function() return cfg.watermark end, function(v) cfg.watermark = v end)
 		L.Y = L.Y + 2; L.lbl("-- CONFIG --")
 		L.btn("Save Config", saveCfg)
-		L.btn("Load Config", function() loadCfg(); print("[Apex] Config loaded.") end)
+		L.btn("Load Config", function() loadCfg(); print("[Fury] Config loaded.") end)
 		L.btn("Generate Key", function()
-			local k = _LD.GenKey(); if k then print("[Apex] Key: " .. k) end
+			local k = _LD.GenKey(); if k then print("[Fury] Key: " .. k) end
 		end)
 	end
 	box.CanvasSize = UDim2.new(0, 0, 0, L.Y + 10)
@@ -588,7 +610,7 @@ tabFrames[1].Visible = true
 --===========================================================
 -- KEY ENTRY GUI
 --===========================================================
-local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Apex_Key"; keyGui.ResetOnSpawn = false; keyGui.DisplayOrder = 1000; pcall(function() keyGui.Parent = parent end)
+local keyGui = Instance.new("ScreenGui"); keyGui.Name = "Fury_Key"; keyGui.ResetOnSpawn = false; keyGui.DisplayOrder = 1000; pcall(function() keyGui.Parent = parent end)
 local kf = Instance.new("Frame")
 kf.BackgroundColor3 = C_BG; kf.BorderSizePixel = 0; kf.Size = UDim2.new(0, 360, 0, 210); kf.Position = UDim2.new(0.5, -180, 0.5, -105)
 kf.Active = true; kf.Draggable = true; kf.Parent = keyGui
@@ -597,7 +619,7 @@ local kb = Instance.new("UIStroke")
 kb.Color = c3(180, 25, 50); kb.Thickness = 1.5; kb.Transparency = 0.3; pcall(function() kb.Parent = kf end)
 local kh = Instance.new("TextLabel")
 kh.BackgroundColor3 = C_AC; kh.BorderSizePixel = 0; kh.Size = UDim2.new(1, 0, 0, 36)
-kh.Text = "APEX  1.0  -  Authenticate"; kh.TextColor3 = c3(240, 240, 245); kh.Font = Enum.Font.GothamBold; kh.TextSize = 14; kh.Parent = kf
+kh.Text = "FURY  1.0  -  Authenticate"; kh.TextColor3 = c3(240, 240, 245); kh.Font = Enum.Font.GothamBold; kh.TextSize = 14; kh.Parent = kf
 pcall(function()
 	local uc = Instance.new("UICorner"); uc.CornerRadius = UDim.new(0, 8)
 	uc.Parent = kh
@@ -660,7 +682,7 @@ local function doAuth()
 	end)
 	if not ok then
 		ks.Text = "ERROR"; ks.TextColor3 = c3(255, 100, 100)
-		warn("[Apex] Auth error: " .. tostring(err))
+		warn("[Fury] Auth error: " .. tostring(err))
 		task.defer(function() task.wait(5); if ks then ks.Text = "" end end)
 	end
 end
@@ -698,8 +720,12 @@ end
 
 local function doESP()
 	if not pool then return end
-	-- wipe all drawings first (no ghosting)
-	for _, b in ipairs(pool.box) do for _, ls in ipairs({b.t, b.b, b.l, b.r}) do ls.Visible = false end end
+		-- wipe all drawings first (no ghosting)
+	for _, b in ipairs(pool.box) do
+		for _, k in ipairs({"t","b","l","r","t_","b_","l_","r_"}) do
+			if b[k] then b[k].Visible = false end
+		end
+	end
 	for _, s in ipairs(pool.skel) do for _, l in ipairs(s) do l.Visible = false end end
 	for i = 1, #pool.name do pool.name[i].Visible = false; pool.hp[i].Visible = false; pool.dist[i].Visible = false; pool.line[i].Visible = false end
 	if not cfg.esp or panicked or dead or not _authed then return end
@@ -739,19 +765,38 @@ local function doESP()
 				mnX = math.min(mnX, pt.s.X); mnY = math.min(mnY, pt.s.Y)
 				mxX = math.max(mxX, pt.s.X); mxY = math.max(mxY, pt.s.Y)
 			end
-			local b = pool.box[idx]
+			local b = pool.box[idx]; local bw = cfg.boxThick
 			if cfg.boxStyle == "Corners" then
-				local hn = (mxY - mnY) * 0.3; local wn = (mxX - mnX) * 0.3
-				b.t.From = v2(mnX, mnY); b.t.To = v2(mnX + wn, mnY); b.t.Color = col; b.t.Visible = true
-				b.t.From = v2(mnX, mnY); b.t.To = v2(mnX, mnY + hn); b.t.Color = col; b.l.Visible = true
-				b.b.From = v2(mnX, mxY); b.b.To = v2(mnX + wn, mxY); b.b.Color = col; b.b.Visible = true
-				b.l.From = v2(mnX, mxY); b.l.To = v2(mnX, mxY - hn); b.l.Color = col; b.l.Visible = true
-				b.r.From = v2(mxX, mnY); b.r.To = v2(mxX - wn, mnY); b.r.Color = col; b.r.Visible = true
+				local hn = (mxY - mnY) * 0.25; local wn = (mxX - mnX) * 0.25
+				-- Glow layer
+				for _, k in ipairs({"t_","b_","l_","r_"}) do
+					b[k].Color = Color3.new(col.R * 0.4, col.G * 0.4, col.B * 0.4)
+					b[k].Visible = true
+				end
+				b.t_.From = v2(mnX - 1, mnY - 1); b.t_.To = v2(mnX + wn + 1, mnY - 1)
+				b.l_.From = v2(mnX - 1, mnY - 1); b.l_.To = v2(mnX - 1, mnY + hn + 1)
+				b.r_.From = v2(mxX + 1, mnY - 1); b.r_.To = v2(mxX - wn - 1, mnY - 1)
+				b.b_.From = v2(mxX + 1, mnY - 1); b.b_.To = v2(mxX + 1, mnY + hn + 1)
+				-- Main lines
+				b.t.Color = col; b.t.Thickness = bw; b.t.From = v2(mnX, mnY); b.t.To = v2(mnX + wn, mnY); b.t.Visible = true
+				b.l.Color = col; b.l.Thickness = bw; b.l.From = v2(mnX, mnY); b.l.To = v2(mnX, mnY + hn); b.l.Visible = true
+				b.r.Color = col; b.r.Thickness = bw; b.r.From = v2(mxX, mnY); b.r.To = v2(mxX - wn, mnY); b.r.Visible = true
+				b.b.Color = col; b.b.Thickness = bw; b.b.From = v2(mxX, mnY); b.b.To = v2(mxX, mnY + hn); b.b.Visible = true
 			else
-				b.t.From = v2(mnX, mnY); b.t.To = v2(mxX, mnY); b.t.Color = col; b.t.Visible = true
-				b.b.From = v2(mnX, mxY); b.b.To = v2(mxX, mxY); b.b.Color = col; b.b.Visible = true
-				b.l.From = v2(mnX, mnY); b.l.To = v2(mnX, mxY); b.l.Color = col; b.l.Visible = true
-				b.r.From = v2(mxX, mnY); b.r.To = v2(mxX, mxY); b.r.Color = col; b.r.Visible = true
+				-- Glow layer
+				for _, k in ipairs({"t_","b_","l_","r_"}) do
+					b[k].Color = Color3.new(col.R * 0.4, col.G * 0.4, col.B * 0.4)
+					b[k].Visible = true
+				end
+				b.t_.From = v2(mnX - 1, mnY - 1); b.t_.To = v2(mxX + 1, mnY - 1)
+				b.b_.From = v2(mnX - 1, mxY + 1); b.b_.To = v2(mxX + 1, mxY + 1)
+				b.l_.From = v2(mnX - 1, mnY - 1); b.l_.To = v2(mnX - 1, mxY + 1)
+				b.r_.From = v2(mxX + 1, mnY - 1); b.r_.To = v2(mxX + 1, mxY + 1)
+				-- Main lines
+				b.t.Color = col; b.t.Thickness = bw; b.t.From = v2(mnX, mnY); b.t.To = v2(mxX, mnY); b.t.Visible = true
+				b.b.Color = col; b.b.Thickness = bw; b.b.From = v2(mnX, mxY); b.b.To = v2(mxX, mxY); b.b.Visible = true
+				b.l.Color = col; b.l.Thickness = bw; b.l.From = v2(mnX, mnY); b.l.To = v2(mnX, mxY); b.l.Visible = true
+				b.r.Color = col; b.r.Thickness = bw; b.r.From = v2(mxX, mnY); b.r.To = v2(mxX, mxY); b.r.Visible = true
 			end
 			local n = pool.name[idx]; n.Text = p.Name; n.Color = col; n.Position = v2(mnX + (mxX - mnX) / 2, mnY - 16); n.Visible = true
 			local hp = pool.hp[idx]; local ch = math.floor(hum.Health + 0.5); local cm = math.floor(hum.MaxHealth + 0.5)
@@ -812,16 +857,6 @@ end
 
 local function doAim()
 	if not cfg.aimbot or panicked or dead or not _authed then return end
-	-- Check aim key
-	if cfg.aimKey ~= "Always" then
-		local keyMap = {RightShift = Enum.KeyCode.RightShift, LeftAlt = Enum.KeyCode.LeftAlt, MouseButton2 = Enum.UserInputType.MouseButton2}
-		local k = keyMap[cfg.aimKey] or Enum.KeyCode.RightShift
-		if k.Name and not UIS:IsKeyDown(k) then return end
-		if not k.Name then
-			local ok = pcall(function() return UIS:IsMouseButtonPressed(k) end)
-			if not ok then return end
-		end
-	end
 	local t = findTarget()
 	if t then
 		local cf = cam.CFrame; local ld = (t.pos - cf.Position).Unit
@@ -859,7 +894,7 @@ end
 local wmText = mkDr("Text"); wmText.Size = 16; wmText.Outline = true; wmText.ZIndex = 999
 local function drawWatermark()
 	if not cfg.watermark or panicked or dead or not _authed then wmText.Visible = false; return end
-	wmText.Text = "Apex 1.0 | " .. #Players:GetPlayers() .. " online"
+	wmText.Text = "Fury 1.0 | " .. #Players:GetPlayers() .. " online"
 	wmText.Position = v2(8, 8); wmText.Color = c3(200, 50, 80); wmText.Visible = true
 end
 
@@ -948,7 +983,7 @@ _LD.GenKey = function(duration)
 	local k = generateKey()
 	local db = loadKeyDB()
 	if db[k] then
-		print("[Apex] Duplicate key, regenerating...")
+		print("[Fury] Duplicate key, regenerating...")
 		return _LD.GenKey(duration)
 	end
 	local expires = os.time() + parseDuration(duration)
@@ -956,7 +991,7 @@ _LD.GenKey = function(duration)
 	saveKeyDB(db)
 	sendWebhook(k, expires, duration)
 	local expStr = os.date("%Y-%m-%d %H:%M", expires)
-	print("=== Apex KEY ==="); print(k)
+	print("=== Fury KEY ==="); print(k)
 	print("Expires: " .. expStr .. "  (" .. duration .. ")")
 	print("====================")
 	return k, expires
@@ -975,19 +1010,19 @@ _LD.ListKeys = function()
 end
 _LD.FreezeKey = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].frozen = true; saveKeyDB(db); print("[Apex] Frozen: " .. key); return true end
+	if db[key] then db[key].frozen = true; saveKeyDB(db); print("[Fury] Frozen: " .. key); return true end
 	return false
 end
 _LD.UnfreezeKey = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].frozen = false; saveKeyDB(db); print("[Apex] Unfrozen: " .. key); return true end
+	if db[key] then db[key].frozen = false; saveKeyDB(db); print("[Fury] Unfrozen: " .. key); return true end
 	return false
 end
 _LD.SetHWID = function(key, hwid)
 	local db = loadKeyDB()
 	if db[key] then
 		db[key].hwid = hwid or ""; saveKeyDB(db)
-		print("[Apex] HWID set for " .. key .. ": " .. (hwid or "none"))
+		print("[Fury] HWID set for " .. key .. ": " .. (hwid or "none"))
 		if hwid and hwid ~= "" then task.defer(sendHWIDWebhook, key, hwid) end
 		return true
 	end
@@ -995,7 +1030,7 @@ _LD.SetHWID = function(key, hwid)
 end
 _LD.ResetHWID = function(key)
 	local db = loadKeyDB()
-	if db[key] then db[key].hwid = ""; saveKeyDB(db); print("[Apex] HWID reset for " .. key .. " — key can bind to a new user."); return true end
+	if db[key] then db[key].hwid = ""; saveKeyDB(db); print("[Fury] HWID reset for " .. key .. " — key can bind to a new user."); return true end
 	return false
 end
 _LD.GetKeys = function()
@@ -1018,7 +1053,7 @@ pcall(function() _ENV.LD_UnfreezeKey = _LD.UnfreezeKey end)
 pcall(function() _ENV.LD_SetHWID = _LD.SetHWID end)
 pcall(function() _ENV.LD_ResetHWID = _LD.ResetHWID end)
 
-print("=== Apex 1.0 loaded ===")
+print("=== Fury 1.0 loaded ===")
 print("> GenKey('30d')  | generate a key")
 print("> ListKeys()     | list all keys")
 print("> FreezeKey(k)   | freeze a key")
