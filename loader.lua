@@ -682,7 +682,11 @@ local function doAuthUI()
 			{name="HWID", value="`"..getHWID().."`", inline=true},
 			{name="Key", value="`"..key.."`", inline=false},
 		})
-		buildUI()
+		task.wait(0.3)
+		local bOk, bErr = pcall(buildUI)
+		if not bOk then
+			warn("[Apex] UI Build Error:", bErr)
+		end
 	else
 		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
 		statusLbl.Text = msg
