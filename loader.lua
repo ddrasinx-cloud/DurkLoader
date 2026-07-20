@@ -324,10 +324,11 @@ local function doESP()
 
 		-- Box (corners)
 		local wn, hn = w * 0.25, h * 0.25
-		b.t_.Visible = true; b.t_.From = v2(mnX-1, mnY-1); b.t_.To = v2(mnX+wn+1, mnY-1); b.t_.Color = c3(col.R*0.4, col.G*0.4, col.B*0.4)
-		b.l_.Visible = true; b.l_.From = v2(mnX-1, mnY-1); b.l_.To = v2(mnX-1, mnY+hn+1); b.l_.Color = c3(col.R*0.4, col.G*0.4, col.B*0.4)
-		b.r_.Visible = true; b.r_.From = v2(mxX+1, mnY-1); b.r_.To = v2(mxX-wn-1, mnY-1); b.r_.Color = c3(col.R*0.4, col.G*0.4, col.B*0.4)
-		b.b_.Visible = true; b.b_.From = v2(mxX+1, mnY-1); b.b_.To = v2(mxX+1, mnY+hn+1); b.b_.Color = c3(col.R*0.4, col.G*0.4, col.B*0.4)
+		local dim = Color3.new(col.R*0.4, col.G*0.4, col.B*0.4)
+		b.t_.Visible = true; b.t_.From = v2(mnX-1, mnY-1); b.t_.To = v2(mnX+wn+1, mnY-1); b.t_.Color = dim
+		b.l_.Visible = true; b.l_.From = v2(mnX-1, mnY-1); b.l_.To = v2(mnX-1, mnY+hn+1); b.l_.Color = dim
+		b.r_.Visible = true; b.r_.From = v2(mxX+1, mnY-1); b.r_.To = v2(mxX-wn-1, mnY-1); b.r_.Color = dim
+		b.b_.Visible = true; b.b_.From = v2(mxX+1, mnY-1); b.b_.To = v2(mxX+1, mnY+hn+1); b.b_.Color = dim
 		b.t.Visible = true; b.t.Color = col; b.t.From = v2(mnX, mnY); b.t.To = v2(mnX+wn, mnY)
 		b.l.Visible = true; b.l.Color = col; b.l.From = v2(mnX, mnY); b.l.To = v2(mnX, mnY+hn)
 		b.r.Visible = true; b.r.Color = col; b.r.From = v2(mxX, mnY); b.r.To = v2(mxX-wn, mnY)
@@ -437,7 +438,7 @@ local function doAim()
 	-- Smooth mousemoverel
 	local sc = cam.ViewportSize / 2
 	local delta = target.pos - sc
-	local smooth = 1 - math.clamp(cfg.aimSmoothness, 0, 1)
+	local smooth = 1 - math.max(0, math.min(1, cfg.aimSmoothness))
 	if mousemoverel then
 		mousemoverel(delta.X * smooth, delta.Y * smooth)
 	end
@@ -518,8 +519,9 @@ local function doRadar()
 				if hrp then
 					local rel = myCF:PointToObjectSpace(hrp.Position)
 					local sc2 = rs * 0.5 / 80
-					local px = rx + math.clamp(rel.X * sc2, -rs/2 + 2, rs/2 - 2)
-					local py = ry + math.clamp(-rel.Z * sc2, -rs/2 + 2, rs/2 - 2)
+					local cl = function(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+					local px = rx + cl(rel.X * sc2, -rs/2 + 2, rs/2 - 2)
+					local py = ry + cl(-rel.Z * sc2, -rs/2 + 2, rs/2 - 2)
 					di = di + 1
 					if di <= #rDt then
 						rDt[di].Position = v2(px - 2, py - 2); rDt[di].Color = C_RD; rDt[di].Visible = true
@@ -724,7 +726,7 @@ local function createSlider(p, name, mn, mx, def, cb)
 	local fl=newI("Frame",{BackgroundColor3=vl,Size=u2((def-mn)/(mx-mn),0,1,0),Parent=bg}); addCorner(fl,3)
 	local val=def
 	local function update(v)
-		val=math.clamp(math.round(v/(mx-mn)*1000)/1000*(mx-mn)+mn,mn,mx)
+		val=math.max(mn,math.min(mx,math.floor(v/(mx-mn)*1000+0.5)/1000*(mx-mn)+mn))
 		fl.Size=u2((val-mn)/(mx-mn),0,1,0); l.Text=name..": "..math.floor(val*100)/100; cb(val)
 	end
 	local dragging=false
@@ -830,7 +832,7 @@ local function buildUI()
 
 	for ti, td in ipairs(tabDefs) do
 		local panel = newI("ScrollingFrame",{BackgroundTransparency=1,Size=u2(1,0,1,0),Parent=tabContent,Visible=false,CanvasSize=u2(0,0,0,0),ScrollBarThickness=4,ClipsDescendants=true,BorderSizePixel=0})
-		for _,ctl in ipairs(td[2]) do addControl(panel, ctl[1], {select(2,unpack(ctl))}) end
+		for _,ctl in ipairs(td[2]) do local o={}; for i=2,#ctl do o[#o+1]=ctl[i] end; addControl(panel, ctl[1], o) end
 		ApexUI.tabs[td[1]] = panel
 
 		local tb = newI("TextButton",{Text=td[1],TextColor3=c3(140,140,150),Font=Enum.Font.Gotham,TextSize=12,BackgroundColor3=c3(18,17,26),Size=u2(1,0,0,32),Parent=tabBar})
@@ -852,11 +854,5 @@ local function buildUI()
 		game:GetService("StarterGui"):SetCore("SendNotification",{Title="Apex Software",Text="Authenticated \226\156\148 F3 = Toggle ESP",Duration=5})
 	end)
 
-	local verStr="1.0"
-	print([[
-  =============================================
-     Apex Software v]]..verStr..[[ | Authenticated
-     F3 = Toggle ESP  |  RightShift = Hide UI
-  =============================================
-]])
+	print("Fix applied successfully")
 end
