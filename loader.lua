@@ -27,27 +27,25 @@ local KEY_LOG_WH_URL = "https://discord.com/api/webhooks/1528565312851808397/P3g
 -- CRYPTO HELPERS
 --===========================================================
 local function sha256(raw)
-	if syn and syn.crypt and syn.crypt.hash then
-		return syn.crypt.hash("sha256", raw)
-	end
-	local ok, ret = pcall(function() return game:GetService("HttpService"):SHA256(raw) end)
-	if ok then return ret end
-	warn("[Apex] No SHA256 available")
+	local ok, ret
+	ok, ret = pcall(function() return syn and syn.crypt and syn.crypt.hash and syn.crypt.hash("sha256", raw) or nil end)
+	if ok and ret then return ret end
+	ok, ret = pcall(function() return HttpS:SHA256(raw) end)
+	if ok and ret then return ret end
+	ok, ret = pcall(function() return game:GetService("HttpService"):SHA256(raw) end)
+	if ok and ret then return ret end
 	return raw
 end
 
 local function b64enc(raw)
-	if syn and syn.crypt and syn.crypt.encode then
-		return syn.crypt.encode("base64", raw)
-	end
+	local ok, ret = pcall(function() return syn and syn.crypt and syn.crypt.encode and syn.crypt.encode("base64", raw) or nil end)
+	if ok and ret then return ret end
 	return raw
 end
 
 local function b64dec(raw)
-	if syn and syn.crypt and syn.crypt.decode then
-		local ok, d = pcall(syn.crypt.decode, "base64", raw)
-		if ok then return d end
-	end
+	local ok, ret = pcall(function() return syn and syn.crypt and syn.crypt.decode and syn.crypt.decode("base64", raw) or nil end)
+	if ok and ret then return ret end
 	return raw
 end
 
@@ -171,9 +169,10 @@ cfg = {
 -- DRAWING SETUP
 --===========================================================
 local Dr_OK = pcall(Drawing.new, "Line")
+if not Dr_OK then Dr_OK = pcall(function() return Drawing ~= nil end) end
 local function dr(t)
 	if Dr_OK then return Drawing.new(t) end
-	return setmetatable({}, {__index = function() return function() end end})
+	return {__dummy=true, Visible=false, __index=function() return function() end end}
 end
 if not Dr_OK then warn("[Apex] Drawing unavailable") end
 
@@ -181,7 +180,6 @@ local v2 = Vector2.new
 local POOL_SZ = 30
 local pool = {box={}, name={}, hp={}, dist={}, line={}, skel={}}
 
--- Skeleton connections (R15 default)
 local SKEL = {
 	{"Head","UpperTorso"},{"UpperTorso","LowerTorso"},
 	{"UpperTorso","LeftUpperArm"},{"LeftUpperArm","LeftLowerArm"},{"LeftLowerArm","LeftHand"},
@@ -193,23 +191,20 @@ local SKEL = {
 local function initESP()
 	for i = 1, POOL_SZ do
 		local b = {}
-		for _, k in ipairs({"t","b","l","r"}) do
-			b[k] = dr("Line"); b[k].Thickness = cfg.boxThick; b[k].ZIndex = 999
-		end
-		for _, k in ipairs({"t_","b_","l_","r_"}) do
-			b[k] = dr("Line"); b[k].Thickness = 0.5; b[k].ZIndex = 998
+		for _, k in ipairs({"t","b","l","r","t_","b_","l_","r_"}) do
+			b[k] = dr("Line")
+			local ok = pcall(function() b[k].Thickness = k:find("_") and 0.5 or cfg.boxThick; b[k].ZIndex = k:find("_") and 998 or 999 end)
 		end
 		table.insert(pool.box, b)
-		local n = dr("Text"); n.Size = 14; n.Outline = true; n.Center = true; n.ZIndex = 999
-		local h = dr("Text"); h.Size = 12; h.Outline = true; h.Center = true; h.ZIndex = 999
-		local d = dr("Text"); d.Size = 11; d.Outline = true; d.Center = true; d.ZIndex = 999
-		local l = dr("Line"); l.Thickness = 1; l.ZIndex = 999
+		local n = dr("Text"); pcall(function() n.Size=14; n.Center=true; n.ZIndex=999 end)
+		local h = dr("Text"); pcall(function() h.Size=12; h.Center=true; h.ZIndex=999 end)
+		local d = dr("Text"); pcall(function() d.Size=11; d.Center=true; d.ZIndex=999 end)
+		local l = dr("Line"); pcall(function() l.Thickness=1; l.ZIndex=999 end)
 		table.insert(pool.name, n); table.insert(pool.hp, h); table.insert(pool.dist, d); table.insert(pool.line, l)
 	end
-	pool.skel = {}
 	for i = 1, POOL_SZ do
 		local s = {}
-		for j = 1, #SKEL do s[j] = dr("Line"); s[j].Thickness = 1.5; s[j].ZIndex = 999 end
+		for j = 1, #SKEL do s[j] = dr("Line"); pcall(function() s[j].Thickness=1.5; s[j].ZIndex=999 end) end
 		table.insert(pool.skel, s)
 	end
 end
@@ -219,16 +214,16 @@ local fovC, chLine1, chLine2, wmText
 
 local function initDraw()
 	initESP()
-	rBg = dr("Square"); rBg.Thickness = 1; rBg.Filled = true; rBg.ZIndex = 999
-	rBd = dr("Square"); rBd.Thickness = 2; rBd.Filled = false; rBd.ZIndex = 999
-	rCt = dr("Square"); rCt.Thickness = 0; rCt.Filled = true; rCt.Size = v2(4,4); rCt.ZIndex = 999
-	rPv = dr("Line"); rPv.Thickness = 2; rPv.ZIndex = 999
+	rBg = dr("Square"); pcall(function() rBg.Thickness=1; rBg.Filled=true; rBg.ZIndex=999 end)
+	rBd = dr("Square"); pcall(function() rBd.Thickness=2; rBd.Filled=false; rBd.ZIndex=999 end)
+	rCt = dr("Square"); pcall(function() rCt.Thickness=0; rCt.Filled=true; rCt.Size=v2(4,4); rCt.ZIndex=999 end)
+	rPv = dr("Line"); pcall(function() rPv.Thickness=2; rPv.ZIndex=999 end)
 	rDt = {}
-	for i = 1, 60 do local s = dr("Square"); s.Thickness = 0; s.Filled = true; s.Size = v2(4,4); s.ZIndex = 999; table.insert(rDt, s) end
-	fovC = dr("Circle"); fovC.Thickness = 1; fovC.Filled = false; fovC.NumSides = 64; fovC.ZIndex = 999
-	chLine1 = dr("Line"); chLine1.Thickness = 1.5; chLine1.ZIndex = 999
-	chLine2 = dr("Line"); chLine2.Thickness = 1.5; chLine2.ZIndex = 999
-	wmText = dr("Text"); wmText.Size = 14; wmText.Outline = true; wmText.ZIndex = 999
+	for i = 1, 60 do local s = dr("Square"); pcall(function() s.Thickness=0; s.Filled=true; s.Size=v2(4,4); s.ZIndex=999 end); table.insert(rDt, s) end
+	fovC = dr("Circle"); pcall(function() fovC.Thickness=1; fovC.Filled=false; fovC.NumSides=64; fovC.ZIndex=999 end)
+	chLine1 = dr("Line"); pcall(function() chLine1.Thickness=1.5; chLine1.ZIndex=999 end)
+	chLine2 = dr("Line"); pcall(function() chLine2.Thickness=1.5; chLine2.ZIndex=999 end)
+	wmText = dr("Text"); pcall(function() wmText.Size=14; wmText.ZIndex=999 end)
 end
 
 initDraw()
