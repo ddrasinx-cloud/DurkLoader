@@ -606,79 +606,137 @@ RunS.RenderStepped:Connect(function(dt)
 end)
 
 --===========================================================
--- UI BUILD — ORION LIBRARY
+-- KEY ENTRY GUI
 --===========================================================
-local Window = OrionLib:MakeWindow({
-	Name = "Apex Software",
-	HidePremium = true,
-	SaveConfig = false,
-	IntroEnabled = false,
-	CloseCallback = function() hideViz() end,
-})
+local keyGui = Instance.new("ScreenGui")
+keyGui.Name = "ApexKeyGui"
+keyGui.ResetOnSpawn = false
+local parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or lp:WaitForChild("PlayerGui")
+keyGui.Parent = parent
 
--- COMBAT TAB
-local CombatTab = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483345998"})
-CombatTab:AddToggle({Name = "Aimbot", Default = false, Callback = function(v) cfg.aimbot = v end})
-CombatTab:AddSlider({Name = "Smoothness", Min = 0, Max = 1, Default = 0.6, Increment = 0.05, Callback = function(v) cfg.aimSmoothness = v end})
-CombatTab:AddSlider({Name = "FOV", Min = 30, Max = 360, Default = 120, Increment = 5, Callback = function(v) cfg.aimFOV = v end})
-CombatTab:AddDropdown({Name = "Aim Key", Options = {"MouseButton2","MouseButton1","E","Q","X"}, Default = "MouseButton2", Callback = function(v) cfg.aimKey = v end})
-CombatTab:AddDropdown({Name = "Aim Part", Options = {"Head","HumanoidRootPart","UpperTorso","LowerTorso"}, Default = "Head", Callback = function(v) cfg.aimPart = v end})
-CombatTab:AddToggle({Name = "Wall Check", Default = false, Callback = function(v) cfg.aimWallCheck = v end})
-CombatTab:AddToggle({Name = "FOV Circle", Default = true, Callback = function(v) cfg.fovCircle = v end})
+local overlay = Instance.new("Frame")
+overlay.BackgroundColor3 = Color3.new(0, 0, 0); overlay.BackgroundTransparency = 0.5
+overlay.Size = UDim2.new(1, 0, 1, 0); overlay.Parent = keyGui
 
--- VISUALS TAB
-local VisualsTab = Window:MakeTab({Name = "Visuals", Icon = "rbxassetid://4483345998"})
-VisualsTab:AddToggle({Name = "ESP", Default = false, Callback = function(v) cfg.esp = v end})
-VisualsTab:AddToggle({Name = "Name Tags", Default = true, Callback = function(v) cfg.nameTag = v end})
-VisualsTab:AddToggle({Name = "Health Bar", Default = true, Callback = function(v) cfg.healthBar = v end})
-VisualsTab:AddToggle({Name = "Distance", Default = true, Callback = function(v) cfg.distance = v end})
-VisualsTab:AddToggle({Name = "Skeleton", Default = true, Callback = function(v) cfg.skeleton = v end})
-VisualsTab:AddToggle({Name = "Tracer Lines", Default = true, Callback = function(v) cfg.tracer = v end})
-VisualsTab:AddToggle({Name = "Team Check", Default = true, Callback = function(v) cfg.teamCheck = v end})
-VisualsTab:AddSlider({Name = "Max Distance", Min = 50, Max = 500, Default = 200, Increment = 10, Callback = function(v) cfg.maxDist = v end})
-VisualsTab:AddSlider({Name = "Box Thickness", Min = 0.5, Max = 3, Default = 1.5, Increment = 0.5, Callback = function(v) cfg.boxThick = v end})
-VisualsTab:AddToggle({Name = "Crosshair", Default = false, Callback = function(v) cfg.crosshair = v end})
-VisualsTab:AddToggle({Name = "Watermark", Default = false, Callback = function(v) cfg.watermark = v end})
-VisualsTab:AddToggle({Name = "Fullbright", Default = false, Callback = function(v) cfg.fullbright = v end})
-VisualsTab:AddToggle({Name = "Zoom", Default = false, Callback = function(v) cfg.zoom = v end})
-VisualsTab:AddSlider({Name = "Zoom Amount", Min = 10, Max = 70, Default = 40, Increment = 5, Callback = function(v) cfg.zoomAmount = v end})
+local bg = Instance.new("Frame")
+bg.BackgroundColor3 = Color3.fromRGB(15, 14, 22); bg.BorderSizePixel = 0
+bg.Size = UDim2.new(0, 360, 0, 240); bg.Position = UDim2.new(0.5, -180, 0.5, -120)
+bg.BackgroundTransparency = 0; bg.Parent = keyGui
+pcall(function() Instance.new("UICorner", bg).CornerRadius = UDim.new(0, 12) end)
+local strk = Instance.new("UIStroke"); strk.Color = Color3.fromRGB(200, 30, 60); strk.Thickness = 1.5; strk.Transparency = 0.4; pcall(function() strk.Parent = bg end)
 
--- RADAR TAB
-local RadarTab = Window:MakeTab({Name = "Radar", Icon = "rbxassetid://4483345998"})
-RadarTab:AddToggle({Name = "Radar", Default = false, Callback = function(v) cfg.radar = v end})
-RadarTab:AddSlider({Name = "Radar Size", Min = 60, Max = 200, Default = 120, Increment = 10, Callback = function(v) cfg.rSize = v end})
-RadarTab:AddSlider({Name = "Opacity", Min = 0, Max = 1, Default = 0.35, Increment = 0.05, Callback = function(v) cfg.rOpacity = v end})
+local title = Instance.new("TextLabel")
+title.BackgroundTransparency = 1; title.Size = UDim2.new(1, 0, 0, 50)
+title.Text = "Apex Software"; title.TextColor3 = Color3.fromRGB(220, 50, 80)
+title.Font = Enum.Font.GothamBlack; title.TextSize = 22; title.Parent = bg
 
--- SETTINGS TAB
-local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483345998"})
-SettingsTab:AddLabel("F3 to toggle ESP")
-SettingsTab:AddLabel("RightShift to show/hide UI")
+local sub = Instance.new("TextLabel")
+sub.BackgroundTransparency = 1; sub.Size = UDim2.new(1, -40, 0, 20); sub.Position = UDim2.new(0, 20, 0, 48)
+sub.Text = "Enter your license key"; sub.TextColor3 = Color3.fromRGB(140, 140, 150)
+sub.Font = Enum.Font.Gotham; sub.TextSize = 13; sub.TextXAlignment = Enum.TextXAlignment.Left; sub.Parent = bg
 
--- AUTH
-local keyInput = ""
-local authStatus = ""
-SettingsTab:AddTextbox({Name = "License Key", Default = "", TextDisappear = false, Callback = function(v) keyInput = v end})
-SettingsTab:AddButton({Name = "Authenticate", Callback = function()
-	if keyInput == "" then OrionLib:MakeNotification({Name="Error", Content="Enter a key", Time=3}); return end
-	local ok, msg = doAuth(keyInput)
-	OrionLib:MakeNotification({Name=ok and "Success" or "Failed", Content=msg, Time=5})
+local keyBox = Instance.new("TextBox")
+keyBox.BackgroundColor3 = Color3.fromRGB(25, 24, 34); keyBox.BorderSizePixel = 0
+keyBox.Size = UDim2.new(1, -40, 0, 38); keyBox.Position = UDim2.new(0, 20, 0, 75)
+keyBox.PlaceholderText = "License Key"; keyBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 110)
+keyBox.Text = ""; keyBox.TextColor3 = Color3.fromRGB(220, 220, 230)
+keyBox.Font = Enum.Font.Gotham; keyBox.TextSize = 15; keyBox.TextXAlignment = Enum.TextXAlignment.Center
+keyBox.ClearTextOnFocus = false; keyBox.Parent = bg
+pcall(function() Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6) end)
+
+local statusLbl = Instance.new("TextLabel")
+statusLbl.BackgroundTransparency = 1; statusLbl.Size = UDim2.new(1, -40, 0, 20); statusLbl.Position = UDim2.new(0, 20, 0, 118)
+statusLbl.Text = ""; statusLbl.TextColor3 = Color3.fromRGB(200, 50, 50)
+statusLbl.Font = Enum.Font.Gotham; statusLbl.TextSize = 12; statusLbl.TextXAlignment = Enum.TextXAlignment.Center; statusLbl.Parent = bg
+
+local authBtn = Instance.new("TextButton")
+authBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 60); authBtn.BorderSizePixel = 0; authBtn.AutoButtonColor = false
+authBtn.Size = UDim2.new(1, -40, 0, 42); authBtn.Position = UDim2.new(0, 20, 0, 145)
+authBtn.Text = "AUTHENTICATE"; authBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+authBtn.Font = Enum.Font.GothamBold; authBtn.TextSize = 14; authBtn.Parent = bg
+pcall(function() Instance.new("UICorner", authBtn).CornerRadius = UDim.new(0, 6) end)
+authBtn.MouseEnter:Connect(function() pcall(function() TS:Create(authBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(230, 50, 80)}):Play() end) end)
+authBtn.MouseLeave:Connect(function() pcall(function() TS:Create(authBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(200, 30, 60)}):Play() end) end)
+
+local function doAuthUI()
+	local key = keyBox.Text:match("^%s*(.-)%s*$")
+	if key == "" then statusLbl.Text = "Enter a license key"; return end
+	authBtn.Text = "VERIFYING..."; authBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+	authBtn.Active = false
+	local ok, msg = doAuth(key)
 	if ok then
-		OrionLib:MakeNotification({Name="Welcome", Content="Apex authenticated for "..lp.Name, Time=5})
-		sendWebhook(WH_URL, "**Login**\nPlayer: "..lp.Name.."\nKey: `"..keyInput.."`\nTime: "..os.date("%c"))
+		statusLbl.TextColor3 = Color3.fromRGB(80, 220, 80)
+		statusLbl.Text = "Authorized! Loading..."
+		keyGui:Destroy()
+		sendWebhook(WH_URL, "**Login**\nPlayer: "..lp.Name.."\nKey: `"..key.."`\nTime: "..os.date("%c"))
+		buildUI()
+	else
+		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
+		statusLbl.Text = msg
+		authBtn.Text = "AUTHENTICATE"; authBtn.BackgroundColor3 = Color3.fromRGB(200, 30, 60)
+		authBtn.Active = true
 	end
-end})
+end
 
-OrionLib:Init()
+authBtn.MouseButton1Click:Connect(doAuthUI)
+keyBox.FocusLost:Connect(function(enter) if enter then doAuthUI() end end)
 
 --===========================================================
--- PANIC / STREAM MODE
+-- UI BUILD (called after auth)
 --===========================================================
-pcall(function()
-	local ss = game:GetService("StarterGui")
-	ss:SetCore("SendNotification", {Title="Apex", Text="Loaded | F3 = Toggle ESP", Duration=5})
-end)
+local Window = nil
+local function buildUI()
+	Window = OrionLib:MakeWindow({
+		Name = "Apex Software",
+		HidePremium = true,
+		SaveConfig = false,
+		IntroEnabled = false,
+		CloseCallback = function() hideViz() end,
+	})
 
-print("|============================================|")
-print("|  Apex Software loaded                     |")
-print("|  F3 = Toggle ESP                          |")
-print("|============================================|")
+	local CombatTab = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483345998"})
+	CombatTab:AddToggle({Name = "Aimbot", Default = false, Callback = function(v) cfg.aimbot = v end})
+	CombatTab:AddSlider({Name = "Smoothness", Min = 0, Max = 1, Default = 0.6, Increment = 0.05, Callback = function(v) cfg.aimSmoothness = v end})
+	CombatTab:AddSlider({Name = "FOV", Min = 30, Max = 360, Default = 120, Increment = 5, Callback = function(v) cfg.aimFOV = v end})
+	CombatTab:AddDropdown({Name = "Aim Key", Options = {"MouseButton2","MouseButton1","E","Q","X"}, Default = "MouseButton2", Callback = function(v) cfg.aimKey = v end})
+	CombatTab:AddDropdown({Name = "Aim Part", Options = {"Head","HumanoidRootPart","UpperTorso","LowerTorso"}, Default = "Head", Callback = function(v) cfg.aimPart = v end})
+	CombatTab:AddToggle({Name = "Wall Check", Default = false, Callback = function(v) cfg.aimWallCheck = v end})
+	CombatTab:AddToggle({Name = "FOV Circle", Default = true, Callback = function(v) cfg.fovCircle = v end})
+
+	local VisualsTab = Window:MakeTab({Name = "Visuals", Icon = "rbxassetid://4483345998"})
+	VisualsTab:AddToggle({Name = "ESP", Default = false, Callback = function(v) cfg.esp = v end})
+	VisualsTab:AddToggle({Name = "Name Tags", Default = true, Callback = function(v) cfg.nameTag = v end})
+	VisualsTab:AddToggle({Name = "Health Bar", Default = true, Callback = function(v) cfg.healthBar = v end})
+	VisualsTab:AddToggle({Name = "Distance", Default = true, Callback = function(v) cfg.distance = v end})
+	VisualsTab:AddToggle({Name = "Skeleton", Default = true, Callback = function(v) cfg.skeleton = v end})
+	VisualsTab:AddToggle({Name = "Tracer Lines", Default = true, Callback = function(v) cfg.tracer = v end})
+	VisualsTab:AddToggle({Name = "Team Check", Default = true, Callback = function(v) cfg.teamCheck = v end})
+	VisualsTab:AddSlider({Name = "Max Distance", Min = 50, Max = 500, Default = 200, Increment = 10, Callback = function(v) cfg.maxDist = v end})
+	VisualsTab:AddSlider({Name = "Box Thickness", Min = 0.5, Max = 3, Default = 1.5, Increment = 0.5, Callback = function(v) cfg.boxThick = v end})
+	VisualsTab:AddToggle({Name = "Crosshair", Default = false, Callback = function(v) cfg.crosshair = v end})
+	VisualsTab:AddToggle({Name = "Watermark", Default = false, Callback = function(v) cfg.watermark = v end})
+	VisualsTab:AddToggle({Name = "Fullbright", Default = false, Callback = function(v) cfg.fullbright = v end})
+	VisualsTab:AddToggle({Name = "Zoom", Default = false, Callback = function(v) cfg.zoom = v end})
+	VisualsTab:AddSlider({Name = "Zoom Amount", Min = 10, Max = 70, Default = 40, Increment = 5, Callback = function(v) cfg.zoomAmount = v end})
+
+	local RadarTab = Window:MakeTab({Name = "Radar", Icon = "rbxassetid://4483345998"})
+	RadarTab:AddToggle({Name = "Radar", Default = false, Callback = function(v) cfg.radar = v end})
+	RadarTab:AddSlider({Name = "Radar Size", Min = 60, Max = 200, Default = 120, Increment = 10, Callback = function(v) cfg.rSize = v end})
+	RadarTab:AddSlider({Name = "Opacity", Min = 0, Max = 1, Default = 0.35, Increment = 0.05, Callback = function(v) cfg.rOpacity = v end})
+
+	local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483345998"})
+	SettingsTab:AddLabel("F3 to toggle ESP")
+	SettingsTab:AddLabel("RightShift to show/hide UI")
+
+	OrionLib:Init()
+
+	pcall(function()
+		local ss = game:GetService("StarterGui")
+		ss:SetCore("SendNotification", {Title="Apex", Text="Authenticated | F3 = Toggle ESP", Duration=5})
+	end)
+
+	print("|============================================|")
+	print("|  Apex Software authenticated              |")
+	print("|  F3 = Toggle ESP                          |")
+	print("|============================================|")
+end
