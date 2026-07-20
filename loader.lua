@@ -776,7 +776,16 @@ local function buildUI()
 	}); addCorner(main,8); addStroke(main,c3(200,30,60),1.5)
 	ApexUI.frame = main
 
-	newI("TextLabel",{Text="Apex Software",TextColor3=c3(220,50,80),Font=Enum.Font.GothamBlack,TextSize=18,BackgroundTransparency=1,Size=u2(1,0,0,34),Parent=main})
+	local titleBar = newI("TextLabel",{Text="Apex Software",TextColor3=c3(220,50,80),Font=Enum.Font.GothamBlack,TextSize=18,BackgroundTransparency=1,Size=u2(1,0,0,34),Parent=main,Active=true})
+	local dragging, dragOff
+	titleBar.InputBegan:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then dragging=true; dragOff=Vector2.new(UIS:GetMouseLocation().X-main.AbsolutePosition.X, UIS:GetMouseLocation().Y-main.AbsolutePosition.Y) end end)
+	titleBar.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
+	UIS.InputChanged:Connect(function(inp, g)
+		if dragging and not g and inp.UserInputType==Enum.UserInputType.MouseMovement then
+			local ml = UIS:GetMouseLocation()
+			main.Position=u2(0,ml.X-dragOff.X,0,ml.Y-dragOff.Y)
+		end
+	end)
 
 	local tabBar = newI("Frame",{BackgroundColor3=c3(18,17,26),Size=u2(0,110,1,-38),Position=u2(0,0,0,36),Parent=main})
 	local tabContent = newI("Frame",{BackgroundTransparency=1,Size=u2(1,-120,1,-38),Position=u2(0,118,0,36),Parent=main})
@@ -837,9 +846,7 @@ local function buildUI()
 		if ti==1 then ApexUI.active=td[1]; panel.Visible=true; tb.BackgroundColor3=c3(200,30,60) end
 	end
 
-	main.DragInput:Connect(function() end) -- prevent initial drag
-
-	UIS.InputBegan:Connect(function(inp, g) if not g and inp.KeyCode==Enum.KeyCode.RightShift then main.Visible=not main.Visible end end, true)
+	UIS.InputBegan:Connect(function(inp, g) if not g and inp.KeyCode==Enum.KeyCode.RightShift then main.Visible=not main.Visible end end)
 
 	pcall(function()
 		game:GetService("StarterGui"):SetCore("SendNotification",{Title="Apex Software",Text="Authenticated \226\156\148 F3 = Toggle ESP",Duration=5})
