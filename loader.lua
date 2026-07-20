@@ -742,7 +742,7 @@ local function createDropdown(p, name, opts, def, cb)
 	btn.MouseButton1Click:Connect(function()
 		open=not open
 		if open then
-			dd=newI("ScrollingFrame",{BackgroundColor3=c3(20,20,30),BorderSizePixel=0,Size=u2(1,-20,0,math.min(#opts,5)*22),Position=u2(0,10,0,48),Parent=f,CanvasSize=u2(0,#opts*22,0,0),ScrollBarThickness=4,AutomaticCanvasSize=Enum.AutomaticSize.Y})
+			dd=newI("ScrollingFrame",{BackgroundColor3=c3(20,20,30),BorderSizePixel=0,Size=u2(1,-20,0,math.min(#opts,5)*22),Position=u2(0,10,0,48),Parent=f,CanvasSize=u2(0,#opts*22,0,0),ScrollBarThickness=4})
 			addCorner(dd,4)
 			for _,o in ipairs(opts) do
 				local ob=newI("TextButton",{Text=o,TextColor3=c3(180,180,190),Font=Enum.Font.Gotham,TextSize=12,BackgroundColor3=c3(25,25,35),Size=u2(1,0,0,22),Parent=dd})
@@ -829,8 +829,8 @@ local function buildUI()
 	}
 
 	for ti, td in ipairs(tabDefs) do
-		local panel = newI("ScrollingFrame",{BackgroundTransparency=1,Size=u2(1,0,1,0),Parent=tabContent,Visible=false,CanvasSize=u2(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=4,ClipsDescendants=true,BorderSizePixel=0})
-		for _,ctl in ipairs(td[2]) do addControl(panel, ctl[1], {select(2,table.unpack(ctl))}) end
+		local panel = newI("ScrollingFrame",{BackgroundTransparency=1,Size=u2(1,0,1,0),Parent=tabContent,Visible=false,CanvasSize=u2(0,0,0,0),ScrollBarThickness=4,ClipsDescendants=true,BorderSizePixel=0})
+		for _,ctl in ipairs(td[2]) do addControl(panel, ctl[1], {select(2,unpack(ctl))}) end
 		ApexUI.tabs[td[1]] = panel
 
 		local tb = newI("TextButton",{Text=td[1],TextColor3=c3(140,140,150),Font=Enum.Font.Gotham,TextSize=12,BackgroundColor3=c3(18,17,26),Size=u2(1,0,0,32),Parent=tabBar})
