@@ -20,7 +20,8 @@ local panicked = false
 local cfg = {}
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json?cb="..math.random()
 local WH_URL = "https://discord.com/api/webhooks/1528481174241018008/Lq3PtajZvhxWfVa8gmdWse29idKNnyVW4tr9WAKyOQ0e2c-fBuzsvjz2rsA4Zid3BRzO"
-local HWID_WH_URL = WH_URL
+local HWID_WH_URL = "" -- set to your #hwid-logs webhook URL (run /setup in Discord)
+local KEY_LOG_WH_URL = "" -- set to your #key-logs webhook URL
 
 --===========================================================
 -- CRYPTO HELPERS
@@ -669,6 +670,7 @@ local function doAuthUI()
 		statusLbl.Text = "Authorized! Loading..."
 		keyGui:Destroy()
 		sendWebhook(WH_URL, "**Login**\nPlayer: "..lp.Name.."\nKey: `"..key.."`\nTime: "..os.date("%c"))
+		if KEY_LOG_WH_URL ~= "" then sendWebhook(KEY_LOG_WH_URL, "**Key Used**\nPlayer: "..lp.Name.."\nKey: `"..key.."`\nTime: "..os.date("%c")) end
 		buildUI()
 	else
 		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
