@@ -170,10 +170,10 @@ local function fetchKeys()
 		if ok and b and #b > 0 then body = b; break end
 	end
 	if not body then
-		local tries = {syn.request, request, http_request}
-		for _, fn in ipairs(tries) do
+		for _, fn in ipairs({"syn.request","request","http_request"}) do
 			pcall(function()
-				local r = fn({Url=KEYS_URL .. cb, Method="GET"})
+				local func = loadstring("return " .. fn)()
+				local r = func({Url=KEYS_URL .. cb, Method="GET"})
 				if r and r.StatusCode == 200 and r.Body and #r.Body > 0 then body = r.Body end
 			end)
 			if body then break end
