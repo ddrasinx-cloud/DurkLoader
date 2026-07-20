@@ -126,15 +126,6 @@ local function parseDuration(str)
 end
 
 --===========================================================
--- ORION LIBRARY LOAD
---===========================================================
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/Snxdfer/back-ups-for-libs/refs/heads/main/Orion.lua"))()
-if not OrionLib then
-	warn("[Apex] Failed to load UI library")
-	return
-end
-
---===========================================================
 -- CFG DEFAULTS
 --===========================================================
 cfg = {
@@ -699,65 +690,165 @@ authBtn.MouseButton1Click:Connect(doAuthUI)
 keyBox.FocusLost:Connect(function(enter) if enter then doAuthUI() end end)
 
 --===========================================================
--- UI BUILD (called after auth)
+-- CUSTOM UI BUILD (no external library)
 --===========================================================
-local Window = nil
+local ApexUI = {gui=nil, frame=nil, tabs={}, active=nil}
+
+local function c3(r,g,b) return Color3.fromRGB(r,g,b) end
+local function u2(x,xo,y,yo) return UDim2.new(x,xo,y,yo) end
+local function newI(ct,props) local o=Instance.new(ct); for k,v in pairs(props) do o[k]=v end; return o end
+
+local function addCorner(p,r) pcall(function() Instance.new("UICorner",p).CornerRadius=UDim.new(0,r or 6) end) end
+local function addStroke(p,c,t) pcall(function() local s=Instance.new("UIStroke",p); s.Color=c or c3(200,30,60); s.Thickness=t or 1; end) end
+
+local function createToggle(p, name, def, cb)
+	local h=24
+	local b=newI("TextButton",{Text="",BackgroundTransparency=1,Size=u2(1,0,0,h),Parent=p})
+	local l=newI("TextLabel",{Text=name,TextColor3=c3(200,200,210),Font=Enum.Font.Gotham,TextSize=13,TextXAlignment=Enum.TextXAlignment.Left,BackgroundTransparency=1,Size=u2(1,-40,0,h),Position=u2(0,10,0,0),Parent=b})
+	local ch=newI("Frame",{BackgroundColor3=def and c3(200,50,80) or c3(40,40,50),Size=u2(0,20,0,20),Position=u2(1,-30,0,2),Parent=b}); addCorner(ch,10)
+	local ci=newI("Frame",{BackgroundColor3=c3(255,255,255),Size=u2(0,14,0,14),Position=u2(0,3,0,3),Parent=ch}); addCorner(ci,7)
+	local on=def
+	local function toggle()
+		on=not on; ch.BackgroundColor3=on and c3(200,50,80) or c3(40,40,50); ci.Visible=on; cb(on)
+	end
+	if on then ci.Visible=true end
+	b.MouseButton1Click:Connect(toggle)
+end
+
+local function createSlider(p, name, mn, mx, def, cb)
+	local h=48
+	local f=newI("Frame",{BackgroundTransparency=1,Size=u2(1,0,0,h),Parent=p})
+	local l=newI("TextLabel",{Text=name..": "..def,TextColor3=c3(180,180,190),Font=Enum.Font.Gotham,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,BackgroundTransparency=1,Size=u2(1,-20,0,18),Position=u2(0,10,0,4),Parent=f})
+	local bg=newI("Frame",{BackgroundColor3=c3(40,40,50),Size=u2(1,-20,0,6),Position=u2(0,10,0,30),Parent=f}); addCorner(bg,3)
+	local vl=c3(200,50,80)
+	local fl=newI("Frame",{BackgroundColor3=vl,Size=u2((def-mn)/(mx-mn),0,1,0),Parent=bg}); addCorner(fl,3)
+	local val=def
+	local function update(v)
+		val=math.clamp(math.round(v/(mx-mn)*1000)/1000*(mx-mn)+mn,mn,mx)
+		fl.Size=u2((val-mn)/(mx-mn),0,1,0); l.Text=name..": "..math.floor(val*100)/100; cb(val)
+	end
+	local dragging=false
+	bg.InputBegan:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then dragging=true; update(mn+(inp.Position.X-bg.AbsolutePosition.X)/bg.AbsoluteSize.X*(mx-mn)) end end)
+	bg.InputEnded:Connect(function(inp) if inp.UserInputType==Enum.UserInputType.MouseButton1 or inp.UserInputType==Enum.UserInputType.Touch then dragging=false end end)
+	bg.MouseMoved:Connect(function(px,py) if dragging then update(mn+(px-bg.AbsolutePosition.X)/bg.AbsoluteSize.X*(mx-mn)) end end)
+end
+
+local function createDropdown(p, name, opts, def, cb)
+	local h=34
+	local f=newI("Frame",{BackgroundTransparency=1,Size=u2(1,0,0,h+30),Parent=p})
+	local lbl=newI("TextLabel",{Text=name,TextColor3=c3(180,180,190),Font=Enum.Font.Gotham,TextSize=12,TextXAlignment=Enum.TextXAlignment.Left,BackgroundTransparency=1,Size=u2(1,-20,0,18),Position=u2(0,10,0,2),Parent=f})
+	local btn=newI("TextButton",{Text=def,TextColor3=c3(200,200,210),Font=Enum.Font.Gotham,TextSize=13,BackgroundColor3=c3(30,30,40),Size=u2(1,-20,0,24),Position=u2(0,10,0,20),Parent=f}); addCorner(btn,4)
+	local open=false; local dd=nil
+	btn.MouseButton1Click:Connect(function()
+		open=not open
+		if open then
+			dd=newI("ScrollingFrame",{BackgroundColor3=c3(20,20,30),BorderSizePixel=0,Size=u2(1,-20,0,math.min(#opts,5)*22),Position=u2(0,10,0,48),Parent=f,CanvasSize=u2(0,#opts*22,0,0),ScrollBarThickness=4,AutomaticCanvasSize=Enum.AutomaticSize.Y})
+			addCorner(dd,4)
+			for _,o in ipairs(opts) do
+				local ob=newI("TextButton",{Text=o,TextColor3=c3(180,180,190),Font=Enum.Font.Gotham,TextSize=12,BackgroundColor3=c3(25,25,35),Size=u2(1,0,0,22),Parent=dd})
+				ob.MouseButton1Click:Connect(function() cb(o); btn.Text=o; open=false; dd:Destroy() end)
+				ob.MouseEnter:Connect(function() ob.BackgroundColor3=c3(40,40,55) end)
+				ob.MouseLeave:Connect(function() ob.BackgroundColor3=c3(25,25,35) end)
+			end
+		elseif dd then dd:Destroy() end
+	end)
+end
+
+local function createLabel(p, t)
+	local l=newI("TextLabel",{Text=t,TextColor3=c3(160,160,170),Font=Enum.Font.Gotham,TextSize=12,BackgroundTransparency=1,Size=u2(1,-20,0,20),Position=u2(0,10,0,0),Parent=p,TextXAlignment=Enum.TextXAlignment.Left})
+end
+
+local function addControl(panel, typ, opts)
+	local sp=newI("Frame",{BackgroundTransparency=1,Size=u2(1,0,0,4),Parent=panel})
+	if typ=="Toggle" then createToggle(panel, opts[1], opts[2], opts[3])
+	elseif typ=="Slider" then createSlider(panel, opts[1], opts[2], opts[3], opts[4], opts[5])
+	elseif typ=="Dropdown" then createDropdown(panel, opts[1], opts[2], opts[3], opts[4])
+	elseif typ=="Label" then createLabel(panel, opts[1]) end
+end
+
 local function buildUI()
-	Window = OrionLib:MakeWindow({
-		Name = "Apex Software",
-		HidePremium = true,
-		SaveConfig = false,
-		IntroEnabled = false,
-		CloseCallback = function() hideViz() end,
-	})
+	local parent = pcall(function() return game:GetService("CoreGui") end) and game:GetService("CoreGui") or lp:WaitForChild("PlayerGui")
+	ApexUI.gui = newI("ScreenGui",{Name="ApexUI",ResetOnSpawn=false,Parent=parent})
 
-	local CombatTab = Window:MakeTab({Name = "Aimbot", Icon = "rbxassetid://4483345998"})
-	CombatTab:AddToggle({Name = "Aimbot", Default = false, Callback = function(v) cfg.aimbot = v end})
-	CombatTab:AddSlider({Name = "Smoothness", Min = 0, Max = 1, Default = 0.6, Increment = 0.05, Callback = function(v) cfg.aimSmoothness = v end})
-	CombatTab:AddSlider({Name = "FOV", Min = 30, Max = 360, Default = 120, Increment = 5, Callback = function(v) cfg.aimFOV = v end})
-	CombatTab:AddDropdown({Name = "Activation Key", Options = {"MouseButton2","MouseButton1","E","Q","X"}, Default = "MouseButton2", Callback = function(v) cfg.aimKey = v end})
-	CombatTab:AddDropdown({Name = "Target Part", Options = {"Head","HumanoidRootPart","UpperTorso","LowerTorso"}, Default = "Head", Callback = function(v) cfg.aimPart = v end})
-	CombatTab:AddToggle({Name = "Wall Check", Default = false, Callback = function(v) cfg.aimWallCheck = v end})
-	CombatTab:AddToggle({Name = "FOV Circle", Default = true, Callback = function(v) cfg.fovCircle = v end})
+	local main = newI("Frame",{
+		BackgroundColor3=c3(12,11,18),Size=u2(0,520,0,380),Position=u2(0.5,-260,0.5,-190),
+		Parent=ApexUI.gui,ClipsDescendants=true,Active=true,BorderSizePixel=0
+	}); addCorner(main,8); addStroke(main,c3(200,30,60),1.5)
+	ApexUI.frame = main
 
-	local VisualsTab = Window:MakeTab({Name = "Visuals", Icon = "rbxassetid://4483345998"})
-	VisualsTab:AddToggle({Name = "ESP", Default = false, Callback = function(v) cfg.esp = v end})
-	VisualsTab:AddToggle({Name = "Team Check", Default = true, Callback = function(v) cfg.teamCheck = v end})
-	VisualsTab:AddSlider({Name = "Max Distance", Min = 50, Max = 500, Default = 200, Increment = 10, Callback = function(v) cfg.maxDist = v end})
-	VisualsTab:AddSlider({Name = "Box Thickness", Min = 0.5, Max = 3, Default = 1.5, Increment = 0.5, Callback = function(v) cfg.boxThick = v end})
-	VisualsTab:AddToggle({Name = "Name Tags", Default = true, Callback = function(v) cfg.nameTag = v end})
-	VisualsTab:AddToggle({Name = "Health Bar", Default = true, Callback = function(v) cfg.healthBar = v end})
-	VisualsTab:AddToggle({Name = "Distance", Default = true, Callback = function(v) cfg.distance = v end})
-	VisualsTab:AddToggle({Name = "Skeleton", Default = true, Callback = function(v) cfg.skeleton = v end})
-	VisualsTab:AddToggle({Name = "Tracer Lines", Default = true, Callback = function(v) cfg.tracer = v end})
-	VisualsTab:AddToggle({Name = "Crosshair", Default = false, Callback = function(v) cfg.crosshair = v end})
-	VisualsTab:AddToggle({Name = "Watermark", Default = false, Callback = function(v) cfg.watermark = v end})
-	VisualsTab:AddToggle({Name = "Fullbright", Default = false, Callback = function(v) cfg.fullbright = v end})
-	VisualsTab:AddToggle({Name = "Zoom", Default = false, Callback = function(v) cfg.zoom = v end})
-	VisualsTab:AddSlider({Name = "Zoom Amount", Min = 10, Max = 70, Default = 40, Increment = 5, Callback = function(v) cfg.zoomAmount = v end})
+	newI("TextLabel",{Text="Apex Software",TextColor3=c3(220,50,80),Font=Enum.Font.GothamBlack,TextSize=18,BackgroundTransparency=1,Size=u2(1,0,0,34),Parent=main})
 
-	local RadarTab = Window:MakeTab({Name = "Radar", Icon = "rbxassetid://4483345998"})
-	RadarTab:AddToggle({Name = "Radar", Default = false, Callback = function(v) cfg.radar = v end})
-	RadarTab:AddSlider({Name = "Radar Size", Min = 60, Max = 200, Default = 120, Increment = 10, Callback = function(v) cfg.rSize = v end})
-	RadarTab:AddSlider({Name = "Opacity", Min = 0, Max = 1, Default = 0.35, Increment = 0.05, Callback = function(v) cfg.rOpacity = v end})
+	local tabBar = newI("Frame",{BackgroundColor3=c3(18,17,26),Size=u2(0,110,1,-38),Position=u2(0,0,0,36),Parent=main})
+	local tabContent = newI("Frame",{BackgroundTransparency=1,Size=u2(1,-120,1,-38),Position=u2(0,118,0,36),Parent=main})
 
-	local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483345998"})
-	SettingsTab:AddLabel("F3 \226\128\148 Toggle ESP")
-	SettingsTab:AddLabel("Right Shift \226\128\148 Show / Hide UI")
-	SettingsTab:AddLabel("End \226\128\148 Unload script")
-	SettingsTab:AddParagraph("Apex Software v1.0", "Secure key system with HWID binding and automatic updates.")
+	local tabDefs = {
+		{"Aimbot",{
+			{"Toggle","Aimbot",false,function(v)cfg.aimbot=v end},
+			{"Slider","Smoothness",0,1,0.6,function(v)cfg.aimSmoothness=v end},
+			{"Slider","FOV",30,360,120,function(v)cfg.aimFOV=v end},
+			{"Dropdown","Aim Key",{"MouseButton2","MouseButton1","E","Q","X"},"MouseButton2",function(v)cfg.aimKey=v end},
+			{"Dropdown","Target Part",{"Head","HumanoidRootPart","UpperTorso","LowerTorso"},"Head",function(v)cfg.aimPart=v end},
+			{"Toggle","Wall Check",false,function(v)cfg.aimWallCheck=v end},
+			{"Toggle","FOV Circle",true,function(v)cfg.fovCircle=v end},
+		}},
+		{"Visuals",{
+			{"Toggle","ESP",false,function(v)cfg.esp=v end},
+			{"Toggle","Team Check",true,function(v)cfg.teamCheck=v end},
+			{"Slider","Max Distance",50,500,200,function(v)cfg.maxDist=v end},
+			{"Slider","Box Thickness",0.5,3,1.5,function(v)cfg.boxThick=v end},
+			{"Toggle","Name Tags",true,function(v)cfg.nameTag=v end},
+			{"Toggle","Health Bar",true,function(v)cfg.healthBar=v end},
+			{"Toggle","Distance",true,function(v)cfg.distance=v end},
+			{"Toggle","Skeleton",true,function(v)cfg.skeleton=v end},
+			{"Toggle","Tracer Lines",true,function(v)cfg.tracer=v end},
+			{"Toggle","Crosshair",false,function(v)cfg.crosshair=v end},
+			{"Toggle","Watermark",false,function(v)cfg.watermark=v end},
+			{"Toggle","Fullbright",false,function(v)cfg.fullbright=v end},
+			{"Toggle","Zoom",false,function(v)cfg.zoom=v end},
+			{"Slider","Zoom Amount",10,70,40,function(v)cfg.zoomAmount=v end},
+		}},
+		{"Radar",{
+			{"Toggle","Radar",false,function(v)cfg.radar=v end},
+			{"Slider","Radar Size",60,200,120,function(v)cfg.rSize=v end},
+			{"Slider","Opacity",0,1,0.35,function(v)cfg.rOpacity=v end},
+		}},
+		{"Settings",{
+			{"Label","F3 \226\128\148 Toggle ESP"},
+			{"Label","Right Shift \226\128\148 Show / Hide UI"},
+			{"Label","End \226\128\148 Unload script"},
+		}},
+	}
 
-	OrionLib:Init()
+	for ti, td in ipairs(tabDefs) do
+		local panel = newI("ScrollingFrame",{BackgroundTransparency=1,Size=u2(1,0,1,0),Parent=tabContent,Visible=false,CanvasSize=u2(0,0,0,0),AutomaticCanvasSize=Enum.AutomaticSize.Y,ScrollBarThickness=4,ClipsDescendants=true,BorderSizePixel=0})
+		for _,ctl in ipairs(td[2]) do addControl(panel, ctl[1], {select(2,table.unpack(ctl))}) end
+		ApexUI.tabs[td[1]] = panel
+
+		local tb = newI("TextButton",{Text=td[1],TextColor3=c3(140,140,150),Font=Enum.Font.Gotham,TextSize=12,BackgroundColor3=c3(18,17,26),Size=u2(1,0,0,32),Parent=tabBar})
+		tb.MouseEnter:Connect(function() if ApexUI.active~=td[1] then tb.BackgroundColor3=c3(30,28,42) end end)
+		tb.MouseLeave:Connect(function() if ApexUI.active~=td[1] then tb.BackgroundColor3=c3(18,17,26) end end)
+		tb.MouseButton1Click:Connect(function()
+			if ApexUI.active then ApexUI.tabs[ApexUI.active].Visible=false end
+			ApexUI.active=td[1]; panel.Visible=true; tb.BackgroundColor3=c3(200,30,60)
+			for _, btn in ipairs(tabBar:GetChildren()) do
+				if btn:IsA("TextButton") and btn~=tb then btn.BackgroundColor3=c3(18,17,26) end
+			end
+		end)
+		if ti==1 then ApexUI.active=td[1]; panel.Visible=true; tb.BackgroundColor3=c3(200,30,60) end
+	end
+
+	main.DragInput:Connect(function() end) -- prevent initial drag
+
+	UIS.InputBegan:Connect(function(inp, g) if not g and inp.KeyCode==Enum.KeyCode.RightShift then main.Visible=not main.Visible end end, true)
 
 	pcall(function()
-		local ss = game:GetService("StarterGui")
-		ss:SetCore("SendNotification", {Title="Apex Software", Text="Authenticated \226\156\148 F3 = Toggle ESP", Duration=5})
+		game:GetService("StarterGui"):SetCore("SendNotification",{Title="Apex Software",Text="Authenticated \226\156\148 F3 = Toggle ESP",Duration=5})
 	end)
 
-	local verStr = "1.0"
+	local verStr="1.0"
 	print([[
   =============================================
-     Apex Software v]] .. verStr .. [[ | Authenticated
+     Apex Software v]]..verStr..[[ | Authenticated
      F3 = Toggle ESP  |  RightShift = Hide UI
   =============================================
 ]])
