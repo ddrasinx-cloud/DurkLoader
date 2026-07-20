@@ -19,9 +19,9 @@ local _authed = false
 local panicked = false
 local cfg = {}
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json?cb="..math.random()
-local WH_URL = "https://discord.com/api/webhooks/1528481174241018008/Lq3PtajZvhxWfVa8gmdWse29idKNnyVW4tr9WAKyOQ0e2c-fBuzsvjz2rsA4Zid3BRzO"
-local HWID_WH_URL = "" -- set to your #hwid-logs webhook URL (run /setup in Discord)
-local KEY_LOG_WH_URL = "" -- set to your #key-logs webhook URL
+local WH_URL = "https://discord.com/api/webhooks/1528565309601091635/nK_nb0wu8ouP5_yTBuyW277DIJxXKGZA0ejHeO2kLfRrAUYVKqXKk93fl7WXg3UxH61b"
+local HWID_WH_URL = "https://discord.com/api/webhooks/1528565316731277372/9EhpNUgIiDeKMt5T-mKZ9Walgwi1Rrxktrpgkhx8yzQ6NCRZfYCPeabAxMnj7ut8QfzB"
+local KEY_LOG_WH_URL = "https://discord.com/api/webhooks/1528565312851808397/P3gV08jiS_WHfycFNgksOBYqXms-kLc1kZFyYOs9PM4hKpHLkUDV9cv3dEYV9ee3JcYe"
 
 --===========================================================
 -- CRYPTO HELPERS
