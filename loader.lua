@@ -573,7 +573,7 @@ local function doAuth(key)
 	if not db or not db[key] then return false, "Invalid key" end
 	local entry = db[key]
 	if entry.frozen then return false, "Key frozen" end
-	if os.time() > entry.expires then return false, "Key expired" end
+	if entry.expires and os.time() > entry.expires then return false, "Key expired" end
 	if not verifySignature(entry) then return false, "Signature mismatch" end
 	local hwid = getHWID()
 	if entry.hwid == "" then
