@@ -1,4 +1,4 @@
--- APEX SOFTWARE — REWRITTEN
+-- APEX SOFTWARE v1.0
 -- UI: Orion Library  |  ESP: Drawing API  |  Aimbot: mousemoverel
 
 --===========================================================
@@ -14,12 +14,12 @@ local lp = Players.LocalPlayer
 local cam = WS.CurrentCamera
 local mouse = lp:GetMouse()
 
+math.randomseed(tick())
 local _SECRET_SALT = "Apex1.0_X7k9m2pQ"
 local _authed = false
 local panicked = false
 local cfg = {}
 local KEYS_URL = "https://raw.githubusercontent.com/ddrasinx-cloud/DurkLoader/master/keys.json?cb="..math.random()
-local WH_URL = "https://discord.com/api/webhooks/1528565309601091635/nK_nb0wu8ouP5_yTBuyW277DIJxXKGZA0ejHeO2kLfRrAUYVKqXKk93fl7WXg3UxH61b"
 local HWID_WH_URL = "https://discord.com/api/webhooks/1528565316731277372/9EhpNUgIiDeKMt5T-mKZ9Walgwi1Rrxktrpgkhx8yzQ6NCRZfYCPeabAxMnj7ut8QfzB"
 local KEY_LOG_WH_URL = "https://discord.com/api/webhooks/1528565312851808397/P3gV08jiS_WHfycFNgksOBYqXms-kLc1kZFyYOs9PM4hKpHLkUDV9cv3dEYV9ee3JcYe"
 
@@ -682,17 +682,11 @@ local function doAuthUI()
 		statusLbl.TextColor3 = Color3.fromRGB(80, 220, 80)
 		statusLbl.Text = "Authorized! Loading..."
 		keyGui:Destroy()
-		sendEmbed(WH_URL, "Login", nil, DColors.green, {
+		sendEmbed(KEY_LOG_WH_URL, "Login", nil, DColors.green, {
 			{name="Player", value=lp.Name, inline=true},
 			{name="HWID", value="`"..getHWID().."`", inline=true},
 			{name="Key", value="`"..key.."`", inline=false},
 		})
-		if KEY_LOG_WH_URL ~= "" then
-			sendEmbed(KEY_LOG_WH_URL, "Key Used", nil, DColors.orange, {
-				{name="Player", value=lp.Name, inline=true},
-				{name="Key", value="`"..key.."`", inline=true},
-			})
-		end
 		buildUI()
 	else
 		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
