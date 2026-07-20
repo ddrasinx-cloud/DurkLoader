@@ -580,34 +580,6 @@ local function doAuth(key)
 end
 
 --===========================================================
--- RENDER LOOP
---===========================================================
-task.spawn(function()
-	while task.wait(1) do
-		if _authed and game.PlaceId ~= 0 then
-			doFullbright()
-		end
-	end
-end)
-
-RunS.RenderStepped:Connect(function(dt)
-	local ok, err = pcall(function()
-		if panicked or not _authed then
-			doESP(); drawFOV(); drawCrosshair(); drawWatermark(); doRadar()
-			return
-		end
-		doZoom()
-		doESP()
-		drawFOV()
-		doAim()
-		drawCrosshair()
-		drawWatermark()
-		doRadar()
-	end)
-	if not ok then print("[Apex Error]", err) end
-end)
-
---===========================================================
 -- KEY ENTRY GUI
 --===========================================================
 local keyGui = Instance.new("ScreenGui")
@@ -680,6 +652,29 @@ local function doAuthUI()
 		if not bOk then
 			warn("[Apex] UI Build Error:", bErr)
 		end
+		task.spawn(function()
+			while task.wait(1) do
+				if _authed and game.PlaceId ~= 0 then
+					doFullbright()
+				end
+			end
+		end)
+		RunS.RenderStepped:Connect(function(dt)
+			local ok, err = pcall(function()
+				if panicked or not _authed then
+					doESP(); drawFOV(); drawCrosshair(); drawWatermark(); doRadar()
+					return
+				end
+				doZoom()
+				doESP()
+				drawFOV()
+				doAim()
+				drawCrosshair()
+				drawWatermark()
+				doRadar()
+			end)
+			if not ok then print("[Apex Error]", err) end
+		end)
 	else
 		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
 		statusLbl.Text = msg
