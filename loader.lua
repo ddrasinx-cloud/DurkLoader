@@ -1027,8 +1027,13 @@ local function doESP()
 			if b[k] then b[k].Visible = false end
 		end
 	end
-	for _, s in ipairs(pool.skel) do for _, l in ipairs(s) do l.Visible = false end end
-	for i = 1, #pool.name do pool.name[i].Visible = false; pool.hp[i].Visible = false; pool.dist[i].Visible = false; pool.line[i].Visible = false end
+	for _, s in ipairs(pool.skel) do for _, l in ipairs(s) do if typeof(l) == "Drawing" then l.Visible = false end end end
+	for i = 1, #pool.name do
+		if typeof(pool.name[i]) == "Drawing" then pool.name[i].Visible = false end
+		if typeof(pool.hp[i]) == "Drawing" then pool.hp[i].Visible = false end
+		if typeof(pool.dist[i]) == "Drawing" then pool.dist[i].Visible = false end
+		if typeof(pool.line[i]) == "Drawing" then pool.line[i].Visible = false end
+	end
 	if not cfg.esp or panicked or dead or not _authed then return end
 	local idx = 0; local myPos = cam.CFrame.Position
 	local plrs = Players:GetPlayers()
