@@ -1,42 +1,10 @@
 {
-  "DURKE-UZHQJ-FLXCL": {
-    "created": 1784499315,
-    "expires": 1784585715,
+  "APEX-52F28DCE5C4C": {
+    "status": "active",
     "duration": "1d",
-    "frozen": false,
-    "hwid": "",
-    "name": "Pain"
-  },
-  "DURKE-P5LEZ-FZLSK": {
-    "created": 1784499675,
-    "expires": 1784586075,
-    "duration": "1d",
-    "frozen": false,
-    "hwid": "",
-    "name": "Pain"
-  },
-  "DURK4-N87HZ-P4PK8": {
-    "created": 1784501848,
-    "expires": null,
-    "duration": "lifetime",
-    "frozen": false,
-    "hwid": "",
-    "name": "popdatbussynigga"
-  },
-  "DURK4-RURSF-QP489": {
-    "created": 1784501912,
-    "expires": null,
-    "duration": "lifetime",
-    "frozen": false,
-    "hwid": "",
-    "name": "kazutrix"
-  },
-  "DURK4-JHJCQ-95V8J": {
-    "created": 1784509225,
-    "expires": 1784595625,
-    "duration": "1d",
-    "frozen": false,
-    "hwid": "",
-    "name": "Pain"
+    "buyer": "Panel",
+    "hwid": null,
+    "created_at": "2026-07-20T16:13:09.188Z",
+    "expires_at": "2026-07-21T16:13:09.188Z"
   }
 }
