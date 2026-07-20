@@ -489,7 +489,7 @@ end
 local function drawWatermark()
 	if not cfg.watermark or panicked or not _authed then wmText.Visible = false; return end
 	wmText.Position = v2(10, 10)
-	wmText.Text = "Apex Software | " .. os.date("%H:%M:%S")
+	wmText.Text = "Apex Software v1.0 | " .. os.date("%H:%M:%S")
 	wmText.Color = c3(200, 50, 80)
 	wmText.Visible = true
 end
@@ -546,13 +546,23 @@ local function doRadar()
 end
 
 --===========================================================
--- SEND WEBHOOK
+-- DISCORD WEBHOOK (embed support)
 --===========================================================
-local function sendWebhook(url, msg)
-	if not url then return end
-	local body = HttpS:JSONEncode({content = msg, username = "Apex Security"})
-	pcall(function() syn.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=body}) end)
-	pcall(function() http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=body}) end)
+local DColors = {green=5763719, red=15548997, blue=3447003, orange=15105570, purple=10181046}
+local function sendEmbed(url, title, desc, color, fields)
+	if not url or url == "" then return end
+	local embed = {title=title, description=desc, color=color or DColors.blue, timestamp=os.date("!%Y-%m-%dT%H:%M:%SZ"), footer={text="Apex Software"}}
+	if fields then embed.fields = fields end
+	local payload = HttpS:JSONEncode({username="Apex Security", embeds={embed}})
+	pcall(function() syn.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=payload}) end)
+	pcall(function() http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=payload}) end)
+end
+
+local function sendPlain(url, msg)
+	if not url or url == "" then return end
+	local payload = HttpS:JSONEncode({content = msg, username = "Apex Security"})
+	pcall(function() syn.request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=payload}) end)
+	pcall(function() http_request({Url=url, Method="POST", Headers={["Content-Type"]="application/json"}, Body=payload}) end)
 end
 
 --===========================================================
@@ -568,8 +578,11 @@ local function doAuth(key)
 	local hwid = getHWID()
 	if entry.hwid == "" then
 		entry.hwid = hwid; db[key] = signEntry(entry)
-		local raw = HttpS:JSONEncode(db)
-		sendWebhook(HWID_WH_URL, "**HWID Bound**\nKey: `"..key.."`\nHWID: `"..hwid.."`\nPlayer: "..lp.Name)
+		sendEmbed(HWID_WH_URL, "HWID Bound", nil, DColors.blue, {
+			{name="Player", value=lp.Name, inline=true},
+			{name="Key", value="`"..key.."`", inline=true},
+			{name="HWID", value="`"..hwid.."`", inline=false},
+		})
 		-- Note: writing back to GitHub isn't done via the script (GitHub API requires token)
 		-- The webhook is informational; manual binding or bot handles it
 	end
@@ -629,11 +642,11 @@ local strk = Instance.new("UIStroke"); strk.Color = Color3.fromRGB(200, 30, 60);
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1; title.Size = UDim2.new(1, 0, 0, 50)
 title.Text = "Apex Software"; title.TextColor3 = Color3.fromRGB(220, 50, 80)
-title.Font = Enum.Font.GothamBlack; title.TextSize = 22; title.Parent = bg
+title.Font = Enum.Font.GothamBlack; title.TextSize = 24; title.Parent = bg
 
 local sub = Instance.new("TextLabel")
 sub.BackgroundTransparency = 1; sub.Size = UDim2.new(1, -40, 0, 20); sub.Position = UDim2.new(0, 20, 0, 48)
-sub.Text = "Enter your license key"; sub.TextColor3 = Color3.fromRGB(140, 140, 150)
+sub.Text = "Enter your license key to continue"; sub.TextColor3 = Color3.fromRGB(140, 140, 150)
 sub.Font = Enum.Font.Gotham; sub.TextSize = 13; sub.TextXAlignment = Enum.TextXAlignment.Left; sub.Parent = bg
 
 local keyBox = Instance.new("TextBox")
@@ -661,16 +674,25 @@ authBtn.MouseLeave:Connect(function() pcall(function() TS:Create(authBtn, TweenI
 
 local function doAuthUI()
 	local key = keyBox.Text:match("^%s*(.-)%s*$")
-	if key == "" then statusLbl.Text = "Enter a license key"; return end
-	authBtn.Text = "VERIFYING..."; authBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
+	if key == "" then statusLbl.Text = "Please enter your license key"; return end
+	authBtn.Text = "VERIFYING \226\128\162"; authBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 110)
 	authBtn.Active = false
 	local ok, msg = doAuth(key)
 	if ok then
 		statusLbl.TextColor3 = Color3.fromRGB(80, 220, 80)
 		statusLbl.Text = "Authorized! Loading..."
 		keyGui:Destroy()
-		sendWebhook(WH_URL, "**Login**\nPlayer: "..lp.Name.."\nKey: `"..key.."`\nTime: "..os.date("%c"))
-		if KEY_LOG_WH_URL ~= "" then sendWebhook(KEY_LOG_WH_URL, "**Key Used**\nPlayer: "..lp.Name.."\nKey: `"..key.."`\nTime: "..os.date("%c")) end
+		sendEmbed(WH_URL, "Login", nil, DColors.green, {
+			{name="Player", value=lp.Name, inline=true},
+			{name="HWID", value="`"..getHWID().."`", inline=true},
+			{name="Key", value="`"..key.."`", inline=false},
+		})
+		if KEY_LOG_WH_URL ~= "" then
+			sendEmbed(KEY_LOG_WH_URL, "Key Used", nil, DColors.orange, {
+				{name="Player", value=lp.Name, inline=true},
+				{name="Key", value="`"..key.."`", inline=true},
+			})
+		end
 		buildUI()
 	else
 		statusLbl.TextColor3 = Color3.fromRGB(220, 60, 60)
@@ -696,25 +718,25 @@ local function buildUI()
 		CloseCallback = function() hideViz() end,
 	})
 
-	local CombatTab = Window:MakeTab({Name = "Combat", Icon = "rbxassetid://4483345998"})
+	local CombatTab = Window:MakeTab({Name = "Aimbot", Icon = "rbxassetid://4483345998"})
 	CombatTab:AddToggle({Name = "Aimbot", Default = false, Callback = function(v) cfg.aimbot = v end})
 	CombatTab:AddSlider({Name = "Smoothness", Min = 0, Max = 1, Default = 0.6, Increment = 0.05, Callback = function(v) cfg.aimSmoothness = v end})
 	CombatTab:AddSlider({Name = "FOV", Min = 30, Max = 360, Default = 120, Increment = 5, Callback = function(v) cfg.aimFOV = v end})
-	CombatTab:AddDropdown({Name = "Aim Key", Options = {"MouseButton2","MouseButton1","E","Q","X"}, Default = "MouseButton2", Callback = function(v) cfg.aimKey = v end})
-	CombatTab:AddDropdown({Name = "Aim Part", Options = {"Head","HumanoidRootPart","UpperTorso","LowerTorso"}, Default = "Head", Callback = function(v) cfg.aimPart = v end})
+	CombatTab:AddDropdown({Name = "Activation Key", Options = {"MouseButton2","MouseButton1","E","Q","X"}, Default = "MouseButton2", Callback = function(v) cfg.aimKey = v end})
+	CombatTab:AddDropdown({Name = "Target Part", Options = {"Head","HumanoidRootPart","UpperTorso","LowerTorso"}, Default = "Head", Callback = function(v) cfg.aimPart = v end})
 	CombatTab:AddToggle({Name = "Wall Check", Default = false, Callback = function(v) cfg.aimWallCheck = v end})
 	CombatTab:AddToggle({Name = "FOV Circle", Default = true, Callback = function(v) cfg.fovCircle = v end})
 
 	local VisualsTab = Window:MakeTab({Name = "Visuals", Icon = "rbxassetid://4483345998"})
 	VisualsTab:AddToggle({Name = "ESP", Default = false, Callback = function(v) cfg.esp = v end})
+	VisualsTab:AddToggle({Name = "Team Check", Default = true, Callback = function(v) cfg.teamCheck = v end})
+	VisualsTab:AddSlider({Name = "Max Distance", Min = 50, Max = 500, Default = 200, Increment = 10, Callback = function(v) cfg.maxDist = v end})
+	VisualsTab:AddSlider({Name = "Box Thickness", Min = 0.5, Max = 3, Default = 1.5, Increment = 0.5, Callback = function(v) cfg.boxThick = v end})
 	VisualsTab:AddToggle({Name = "Name Tags", Default = true, Callback = function(v) cfg.nameTag = v end})
 	VisualsTab:AddToggle({Name = "Health Bar", Default = true, Callback = function(v) cfg.healthBar = v end})
 	VisualsTab:AddToggle({Name = "Distance", Default = true, Callback = function(v) cfg.distance = v end})
 	VisualsTab:AddToggle({Name = "Skeleton", Default = true, Callback = function(v) cfg.skeleton = v end})
 	VisualsTab:AddToggle({Name = "Tracer Lines", Default = true, Callback = function(v) cfg.tracer = v end})
-	VisualsTab:AddToggle({Name = "Team Check", Default = true, Callback = function(v) cfg.teamCheck = v end})
-	VisualsTab:AddSlider({Name = "Max Distance", Min = 50, Max = 500, Default = 200, Increment = 10, Callback = function(v) cfg.maxDist = v end})
-	VisualsTab:AddSlider({Name = "Box Thickness", Min = 0.5, Max = 3, Default = 1.5, Increment = 0.5, Callback = function(v) cfg.boxThick = v end})
 	VisualsTab:AddToggle({Name = "Crosshair", Default = false, Callback = function(v) cfg.crosshair = v end})
 	VisualsTab:AddToggle({Name = "Watermark", Default = false, Callback = function(v) cfg.watermark = v end})
 	VisualsTab:AddToggle({Name = "Fullbright", Default = false, Callback = function(v) cfg.fullbright = v end})
@@ -727,18 +749,23 @@ local function buildUI()
 	RadarTab:AddSlider({Name = "Opacity", Min = 0, Max = 1, Default = 0.35, Increment = 0.05, Callback = function(v) cfg.rOpacity = v end})
 
 	local SettingsTab = Window:MakeTab({Name = "Settings", Icon = "rbxassetid://4483345998"})
-	SettingsTab:AddLabel("F3 to toggle ESP")
-	SettingsTab:AddLabel("RightShift to show/hide UI")
+	SettingsTab:AddLabel("F3 \226\128\148 Toggle ESP")
+	SettingsTab:AddLabel("Right Shift \226\128\148 Show / Hide UI")
+	SettingsTab:AddLabel("End \226\128\148 Unload script")
+	SettingsTab:AddParagraph("Apex Software v1.0", "Secure key system with HWID binding and automatic updates.")
 
 	OrionLib:Init()
 
 	pcall(function()
 		local ss = game:GetService("StarterGui")
-		ss:SetCore("SendNotification", {Title="Apex", Text="Authenticated | F3 = Toggle ESP", Duration=5})
+		ss:SetCore("SendNotification", {Title="Apex Software", Text="Authenticated \226\156\148 F3 = Toggle ESP", Duration=5})
 	end)
 
-	print("|============================================|")
-	print("|  Apex Software authenticated              |")
-	print("|  F3 = Toggle ESP                          |")
-	print("|============================================|")
+	local verStr = "1.0"
+	print([[
+  =============================================
+     Apex Software v]] .. verStr .. [[ | Authenticated
+     F3 = Toggle ESP  |  RightShift = Hide UI
+  =============================================
+]])
 end
