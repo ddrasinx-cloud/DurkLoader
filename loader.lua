@@ -564,15 +564,19 @@ local function doAuth(key)
 	if entry.expires and os.time() > entry.expires then return false, "Key expired" end
 	if not verifySignature(entry) then return false, "Signature mismatch" end
 	local hwid = getHWID()
+	local cacheOk, cache = pcall(function() return HttpS:JSONDecode(readfile("ApexHWIDCache.json")) end)
+	if not cacheOk or type(cache) ~= "table" then cache = {} end
 	if entry.hwid == "" then
 		entry.hwid = hwid; db[key] = signEntry(entry)
-		sendEmbed(HWID_WH_URL, "HWID Bound", nil, DColors.blue, {
-			{name="Player", value=lp.Name, inline=true},
-			{name="Key", value="`"..key.."`", inline=true},
-			{name="HWID", value="`"..hwid.."`", inline=false},
-		})
-		-- Note: writing back to GitHub isn't done via the script (GitHub API requires token)
-		-- The webhook is informational; manual binding or bot handles it
+		if not cache[key] or cache[key] ~= hwid then
+			cache[key] = hwid
+			pcall(function() writefile("ApexHWIDCache.json", HttpS:JSONEncode(cache)) end)
+			sendEmbed(HWID_WH_URL, "HWID Bound", nil, DColors.blue, {
+				{name="Player", value=lp.Name, inline=true},
+				{name="Key", value="`"..key.."`", inline=true},
+				{name="HWID", value="`"..hwid.."`", inline=false},
+			})
+		end
 	end
 	if entry.hwid ~= hwid then return false, "HWID mismatch" end
 	_authed = true
