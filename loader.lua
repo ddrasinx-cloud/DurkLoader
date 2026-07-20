@@ -1299,7 +1299,7 @@ hook(UIS.InputBegan:Connect(function(input, gpe)
 end))
 
 hook(RunS.RenderStepped:Connect(function(dt)
-	pcall(function()
+	local ok, err = pcall(function()
 		if dead then return end
 		if UIS:IsKeyDown(Enum.KeyCode.F3) then
 			if not f3Down then f3Down = true; cfg.esp = not cfg.esp; saveCfg() end
@@ -1308,6 +1308,7 @@ hook(RunS.RenderStepped:Connect(function(dt)
 		end
 		doFullbright(); doESP(); drawFOV(); doAim(); doZoom(); doRadar(); drawCrosshair(); drawWatermark()
 	end)
+	if not ok then print("[Apex Render Error]", err) end
 end))
 
 --===========================================================
